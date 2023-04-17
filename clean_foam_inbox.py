@@ -1,12 +1,13 @@
 """Check Outlook inboxes for redundant cert e-mails."""
 
 import datetime
-from typing import Dict, List, Optional
 
 import pandas as pd
 import pythoncom
 from win32com import client as wclient
 
+from helpers.json_help import df_json_handler
+from helpers.outlook import find_folders
 from log_setup import lg
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
@@ -21,7 +22,7 @@ outlook = wclient.Dispatch("Outlook.Application", pythoncom.CoInitialize()).GetN
 
 
 # Process inbox folders
-def process_folder(olFolder, folder_path):
+def cluster_mail_items_by_time(olFolder, folder_path):
     items = olFolder.Items
     results = process_mail_items(folder_path, items)
 
@@ -74,81 +75,22 @@ def process_mail_items(folder_path, items):
     return results
 
 
-def find_folders(store_name_filter: str, must_find_list: List[str] = '', map_all=False) -> Dict[str, any]:
-    """
-    Recursively searches for all folders within Outlook stores whose display names contain the specified
-    store_name_filter string, and returns a dictionary where the keys are the folder paths and the values
-    are the corresponding olFolder objects. Raises a custom exception if any of the folders in must_find_list
-    are not found.
-    """
-    must_find_list = must_find_list if (must_find_list and not map_all) else ''
-    folders_dict = {}
-    target_store = get_store_by_name(store_name_filter)
-    parent_folder = target_store.GetRootFolder()
-    map_folder_structure_to_flat_dict(folders_dict, parent_folder, must_find_list)
-    for folder in must_find_list:
-        if folder not in folders_dict.keys():
-            raise Exception(f"Required folder '{folder}' not found!")
-    return folders_dict
-
-
-def get_store_by_name(store_name_filter: str) -> Optional[object]:
-    """Searches for an Outlook store with a display name that contains the given filter string and returns the first
-    store that matches. If no matching store is found, returns None.
-
-    :param store_name_filter: A string to search for in the display names of the Outlook stores.
-    :return: The first Outlook store that matches the search filter, or None if no match is found.
-    """
-    for olStore in outlook.Stores:
-        if store_name_filter not in olStore.DisplayName:
-            continue
-        target_store = olStore
-        return target_store
-    return None
-
-
-def map_folder_structure_to_flat_dict(folders_dict: Dict[str, any], parent_folder: wclient.CDispatch,
-                                      must_find_list: List[str]) -> None:
-    """Iteratively searches for all folders within the specified parent_folder object and updates the
-    folders_dict dictionary with the folder paths and olFolder objects. Stops searching as soon as all
-    folders in must_find_list have been found.
-
-    :param folders_dict: A dictionary to store the folder paths and olFolder objects.
-    :type folders_dict: Dict[str, any]
-    :param parent_folder: The parent folder object to search within.
-    :type parent_folder: any
-    :param must_find_list: A list of folder paths that must be found. If not all are found, continue searching.
-    :type must_find_list: List[str]
-    :return: None
-    :rtype: None
-    """
-    folders_stack = [parent_folder]
-    while folders_stack:
-        current_folder = folders_stack.pop()
-        for olFolder in current_folder.Folders:
-            folder_path = olFolder.FolderPath
-            folders_dict[folder_path] = olFolder
-            if must_find_list:
-                if all(mfitem in folders_dict.keys() for mfitem in must_find_list):
-                    return
-            folders_stack.append(olFolder)
-
 def series_to_df(srs):
     return pd.DataFrame.from_dict({k: [v] for k, v in srs.to_dict().items()})
 
 
-def main_folders_process():
+def main_folders_process(acct_name:str, proc_folders:list):
 
     # get a dictionary of folders from the account
-    found_folders_dict = find_folders(account_name, production_inbox_folders, map_all=True)
-    for folder_path in production_inbox_folders:
+    found_folders_dict = find_folders(acct_name, proc_folders)
+    for folder_path in proc_folders:
         olFolder = found_folders_dict.get(folder_path)
         if olFolder is None:
             lg.debug(f'{folder_path} was not found and will not be processed!')
             continue
         lg.debug(f'Processing folder: {folder_path}')
         smry['checked_folders'][folder_path] = {'all_subj_lines': [], 'matched': []}
-        ibdf = process_folder(olFolder, folder_path)
+        ibdf = cluster_mail_items_by_time(olFolder, folder_path)
 
         if ibdf.empty:
             lg.debug(f'No results in {folder_path}')
@@ -161,7 +103,7 @@ def main_folders_process():
             keep_item_rows.append(grp[1].iloc[0])
             move_item_rows.append([row for row in grp[1].iloc[1:].iterrows()])
         smry['checked_folders'][folder_path]['ibdf'] = ibdf
-        smry['checked_folders'][folder_path]['dfg'] = ibdf
+        smry['checked_folders'][folder_path]['dfg'] = dfg
         smry['checked_folders'][folder_path]['keep_item_rows'] = keep_item_rows
         smry['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
 
@@ -175,24 +117,13 @@ if __name__ == '__main__':
     # write the smry dictionary to a file to make it easier to look at
     import json
 
-
-    def df_json_handler(df):
-        try:
-            return df.to_dict()
-        except AttributeError as aer:
-            if isinstance(df, pd.Timestamp) or isinstance(df, pd.Timedelta):
-                return df.isoformat()
-            else:
-                return repr(df)
-
-
     # global production_inbox_folders, smry
     account_name = acct_path_dct['account_name']
     production_inbox_folders = acct_path_dct['inbox_folders']
     # a summary debug info dictionary
     smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[])
 
-    main_folders_process()
+    main_folders_process(account_name, production_inbox_folders)
 
     with open('./last_smry.json', 'w') as jf:
         json.dump(smry, jf, indent=4, default=df_json_handler)
@@ -232,5 +163,14 @@ if __name__ == '__main__':
         lg.debug(unmatched)
     else:
         lg.debug('All e-mails to be moved have a matched kept e-mail.')
+
+        for row in mirs:
+            if len(row) > 1:
+                lg.warning(f'mirs row list had more than a single item.')
+            for rlist in row:
+                cmail = rlist[0]
+
+
+
 
 pass
