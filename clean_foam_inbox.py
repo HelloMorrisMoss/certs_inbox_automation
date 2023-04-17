@@ -1,11 +1,14 @@
+"""Check Outlook inboxes for redundant cert e-mails."""
+
 import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
+import pythoncom
 from win32com import client as wclient
 
 from log_setup import lg
-from untracked_config.accounts_and_folder_paths import account_name, inbox_folders
+from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
 from untracked_config.foam_clean_product_names import product_names
 from untracked_config.subject_regex import subject_pattern
@@ -14,25 +17,7 @@ now = datetime.datetime.now()
 lg.debug(f'Starting at {now}')
 
 # Connect to Outlook application
-outlook = wclient.Dispatch("Outlook.Application").GetNamespace("MAPI")
-
-# Get shared Inbox folder
-try:
-    recipient = outlook.CreateRecipient(account_name)
-    recipient.Resolve()
-    shared_inbox = outlook.GetSharedDefaultFolder(recipient, 6)
-except Exception as e:
-    lg.debug(f"Error: {e}")
-    quit()
-
-
-# Find the target folder to move emails to
-def find_target_folder(folder_path):
-    for olStore in outlook.Stores:
-        for olFolder in olStore.GetRootFolder().Folders:
-            if olFolder.FolderPath == folder_path:
-                return olFolder
-    return None
+outlook = wclient.Dispatch("Outlook.Application", pythoncom.CoInitialize()).GetNamespace("MAPI")
 
 
 # Process inbox folders
@@ -89,31 +74,53 @@ def process_mail_items(folder_path, items):
     return results
 
 
-
-def find_folders(store_name_filter: str, must_find_list: List[str]) -> Dict[str, any]:
+def find_folders(store_name_filter: str, must_find_list: List[str] = '', map_all=False) -> Dict[str, any]:
     """
     Recursively searches for all folders within Outlook stores whose display names contain the specified
     store_name_filter string, and returns a dictionary where the keys are the folder paths and the values
     are the corresponding olFolder objects. Raises a custom exception if any of the folders in must_find_list
     are not found.
     """
+    must_find_list = must_find_list if (must_find_list and not map_all) else ''
     folders_dict = {}
-    for olStore in outlook.Stores:
-        if store_name_filter not in olStore.DisplayName:
-            continue
-        parent_folder = olStore.GetRootFolder()
-        recurse_folder_structure(folders_dict, parent_folder, must_find_list)
+    target_store = get_store_by_name(store_name_filter)
+    parent_folder = target_store.GetRootFolder()
+    map_folder_structure_to_flat_dict(folders_dict, parent_folder, must_find_list)
     for folder in must_find_list:
         if folder not in folders_dict.keys():
             raise Exception(f"Required folder '{folder}' not found!")
     return folders_dict
 
 
-def recurse_folder_structure(folders_dict: Dict[str, any], parent_folder: any, must_find_list: List[str]) -> None:
+def get_store_by_name(store_name_filter: str) -> Optional[object]:
+    """Searches for an Outlook store with a display name that contains the given filter string and returns the first
+    store that matches. If no matching store is found, returns None.
+
+    :param store_name_filter: A string to search for in the display names of the Outlook stores.
+    :return: The first Outlook store that matches the search filter, or None if no match is found.
     """
-    Iteratively searches for all folders within the specified parent_folder object, and updates the
+    for olStore in outlook.Stores:
+        if store_name_filter not in olStore.DisplayName:
+            continue
+        target_store = olStore
+        return target_store
+    return None
+
+
+def map_folder_structure_to_flat_dict(folders_dict: Dict[str, any], parent_folder: wclient.CDispatch,
+                                      must_find_list: List[str]) -> None:
+    """Iteratively searches for all folders within the specified parent_folder object and updates the
     folders_dict dictionary with the folder paths and olFolder objects. Stops searching as soon as all
     folders in must_find_list have been found.
+
+    :param folders_dict: A dictionary to store the folder paths and olFolder objects.
+    :type folders_dict: Dict[str, any]
+    :param parent_folder: The parent folder object to search within.
+    :type parent_folder: any
+    :param must_find_list: A list of folder paths that must be found. If not all are found, continue searching.
+    :type must_find_list: List[str]
+    :return: None
+    :rtype: None
     """
     folders_stack = [parent_folder]
     while folders_stack:
@@ -121,43 +128,42 @@ def recurse_folder_structure(folders_dict: Dict[str, any], parent_folder: any, m
         for olFolder in current_folder.Folders:
             folder_path = olFolder.FolderPath
             folders_dict[folder_path] = olFolder
-            if all(mfitem in folders_dict.keys() for mfitem in must_find_list):
-                return
+            if must_find_list:
+                if all(mfitem in folders_dict.keys() for mfitem in must_find_list):
+                    return
             folders_stack.append(olFolder)
-
-
-# a summary debug info dictionary
-smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[])
-
-# get a dictionary of folders from the account
-found_folders_dict = find_folders(account_name, inbox_folders)
-
-for folder_path in inbox_folders:
-    olFolder = found_folders_dict.get(folder_path)
-    if olFolder is None:
-        lg.debug(f'{folder_path} was not found and will not be processed!')
-        continue
-    lg.debug(f'Processing folder: {folder_path}')
-    smry['checked_folders'][folder_path] = {'all_subj_lines': [], 'matched': []}
-    ibdf = process_folder(olFolder, folder_path)
-
-    if ibdf.empty:
-        lg.debug(f'No results in {folder_path}')
-        continue
-
-    dfg = ibdf.groupby(['product_number', 'so_number', 'lot8', 'c_number'])
-    keep_item_rows = []
-    move_item_rows = []
-    for grp in dfg:
-        keep_item_rows.append(grp[1].iloc[0])
-        move_item_rows.append([row for row in grp[1].iloc[1:].iterrows()])
-    smry['checked_folders'][folder_path]['ibdf'] = ibdf
-    smry['checked_folders'][folder_path]['dfg'] = ibdf
-    smry['checked_folders'][folder_path]['keep_item_rows'] = keep_item_rows
-    smry['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
 
 def series_to_df(srs):
     return pd.DataFrame.from_dict({k: [v] for k, v in srs.to_dict().items()})
+
+
+def main_folders_process():
+
+    # get a dictionary of folders from the account
+    found_folders_dict = find_folders(account_name, production_inbox_folders, map_all=True)
+    for folder_path in production_inbox_folders:
+        olFolder = found_folders_dict.get(folder_path)
+        if olFolder is None:
+            lg.debug(f'{folder_path} was not found and will not be processed!')
+            continue
+        lg.debug(f'Processing folder: {folder_path}')
+        smry['checked_folders'][folder_path] = {'all_subj_lines': [], 'matched': []}
+        ibdf = process_folder(olFolder, folder_path)
+
+        if ibdf.empty:
+            lg.debug(f'No results in {folder_path}')
+            continue
+
+        dfg = ibdf.groupby(['product_number', 'so_number', 'lot8', 'c_number'])
+        keep_item_rows = []
+        move_item_rows = []
+        for grp in dfg:
+            keep_item_rows.append(grp[1].iloc[0])
+            move_item_rows.append([row for row in grp[1].iloc[1:].iterrows()])
+        smry['checked_folders'][folder_path]['ibdf'] = ibdf
+        smry['checked_folders'][folder_path]['dfg'] = ibdf
+        smry['checked_folders'][folder_path]['keep_item_rows'] = keep_item_rows
+        smry['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
 
 
 if __name__ == '__main__':
@@ -180,12 +186,20 @@ if __name__ == '__main__':
                 return repr(df)
 
 
+    # global production_inbox_folders, smry
+    account_name = acct_path_dct['account_name']
+    production_inbox_folders = acct_path_dct['inbox_folders']
+    # a summary debug info dictionary
+    smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[])
+
+    main_folders_process()
+
     with open('./last_smry.json', 'w') as jf:
         json.dump(smry, jf, indent=4, default=df_json_handler)
 
     # check that the move rows all have keep rows to match
     unmatched = []
-    for fp in inbox_folders:
+    for fp in production_inbox_folders:
         if fp not in smry['checked_folders'].keys():
             continue  # skip the ones that didn't have matches
         if smry['checked_folders'][fp].get('move_item_rows') is None:

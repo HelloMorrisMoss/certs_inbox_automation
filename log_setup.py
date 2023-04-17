@@ -40,7 +40,7 @@ def setup_logger():
     logr.addHandler(c_handler)
 
     # file logger
-    f_handler = RotatingFileHandler('logs/program.log', maxBytes=2000000)
+    f_handler = RotatingFileHandler('./logs/program.log', maxBytes=2000000)
     f_handler.setLevel(base_log_level)
     f_string = '"%(asctime)s","%(name)s", "%(breadcrumbs)s","%(funcName)s","%(lineno)d","%(levelname)s","%(message)s"'
     f_format = logging.Formatter(f_string)

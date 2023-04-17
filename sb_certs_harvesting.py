@@ -1,9 +1,10 @@
 """Collecting cert PDFs for later study."""
 
 import os
+
 import win32com.client as win32
 
-from untracked_config.accounts_and_folder_paths import inbox_folders
+from untracked_config.accounts_and_folder_paths import production_inbox_folders
 
 
 class PathConverter:
@@ -56,7 +57,7 @@ def export_pdfs_from_inbox():
         # Loop through each folder in the store
         for ol_folder in ol_store.GetRootFolder().Folders:
             # Check if the folder has the desired path
-            if ol_folder.FolderPath in inbox_folders:
+            if ol_folder.FolderPath in production_inbox_folders:
                 inbox_folder = ol_folder
                 break
         else:
