@@ -17,8 +17,7 @@ valid_categories = color_map.values()
 
 
 def add_categories_to_mail(mail: wclient.CDispatch, categories: Union[str, List[str]]) -> None:
-    """
-    Add categories to an Outlook mail item.
+    """Add categories to an Outlook mail item.
 
     :param mail: Outlook mail item to add categories to.
     :param categories: A string or list of strings specifying the categories to add.
@@ -40,8 +39,7 @@ def add_categories_to_mail(mail: wclient.CDispatch, categories: Union[str, List[
 
 
 def remove_categories_from_mail(mail: wclient.CDispatch, categories: Union[str, List[str]]) -> None:
-    """
-    Remove categories from an Outlook mail item.
+    """Remove categories from an Outlook mail item.
 
     :param mail: Outlook mail item to remove categories from.
     :param categories: A string or list of strings specifying the categories to remove.
@@ -81,6 +79,25 @@ def get_actionable_categories(action_text: str, categories: Union[str, List[str]
         raise ValueError("Categories must be a string or a list of strings")
 
     # normalize the categories and ensure they are valid color categories
+    normalized_categories = normalize_color_categories_list(categories)
+
+    # Get the existing categories of the mail item
+    existing_categories = mail.Categories.split(", ") if mail.Categories else []
+
+    return existing_categories, normalized_categories
+
+
+def normalize_color_categories_list(categories: list):
+    """Normalize the categories and ensure they are valid color categories
+
+    example:
+    nccl = normalize_color_categories_list(['grey', 'Blue', 'Red Category'])
+    print(nccl)
+    >[['Grey Category', 'Blue Category', 'Red Category']]
+
+    :param categories: list, containing strings of either categories or the color name.
+    :returns: list, the list of strings with valid color categories.
+    """
     normalized_categories = []
     for color in categories:
         color = color.lower()
@@ -91,13 +108,9 @@ def get_actionable_categories(action_text: str, categories: Union[str, List[str]
             raise ValueError(f"{color} is not a valid color.")
         else:
             color_cat = color_map[color]
-            print(f'{color} being {action_text} as {color_cat}')
+            print(f'{color} being interpreted as {color_cat}')
             normalized_categories.append(color_cat)
-
-    # Get the existing categories of the mail item
-    existing_categories = mail.Categories.split(", ") if mail.Categories else []
-
-    return existing_categories, normalized_categories
+    return normalized_categories
 
 
 def get_store_by_name(store_name_filter: str, outlook_obj: wclient.CDispatch) -> Optional[object]:

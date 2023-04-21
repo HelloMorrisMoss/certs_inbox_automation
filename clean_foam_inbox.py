@@ -4,12 +4,11 @@ import datetime
 from pprint import pprint
 
 import pandas as pd
-import pythoncom
-from win32com import client as wclient
 
 from helpers.json_help import df_json_handler
 from helpers.outlook_helpers import add_categories_to_mail, find_folders_in_outlook, remove_categories_from_mail
 from log_setup import lg
+from outlook_interface import wc_outlook
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
 from untracked_config.foam_clean_product_names import product_names
@@ -18,9 +17,8 @@ from untracked_config.subject_regex import subject_pattern
 now = datetime.datetime.now()
 lg.debug(f'Starting at {now}')
 
-# Connect to Outlook application
-outlook = wclient.Dispatch("Outlook.Application", pythoncom.CoInitialize()).GetNamespace("MAPI")
 
+wc_outlook = wc_outlook.get_outlook_folders()
 
 # Process inbox folders
 def cluster_mail_items_by_time(olFolder, folder_path):
@@ -82,9 +80,8 @@ def series_to_df(srs):
 
 
 def main_folders_process(acct_name: str, proc_folders: list):
-
     # get a dictionary of folders from the account
-    found_folders_dict = find_folders_in_outlook(outlook, acct_name, proc_folders)
+    found_folders_dict = find_folders_in_outlook(wc_outlook, acct_name, proc_folders)
     for folder_path in proc_folders:
         olFolder = found_folders_dict.get(folder_path)
         if olFolder is None:
@@ -102,7 +99,7 @@ def main_folders_process(acct_name: str, proc_folders: list):
         keep_item_rows = []
         move_item_rows = []
         for grp in dfg:
-            keep_item_rows.append([item_row for item_row in grp[1].iloc[:1].iterrows()])  #.append([grp[1].iloc[0:1]])
+            keep_item_rows.append([item_row for item_row in grp[1].iloc[:1].iterrows()])  # .append([grp[1].iloc[0:1]])
             move_item_rows.append([item_row for item_row in grp[1].iloc[1:].iterrows()])
         smry['checked_folders'][folder_path]['ibdf'] = ibdf
         smry['checked_folders'][folder_path]['dfg'] = dfg
@@ -110,31 +107,41 @@ def main_folders_process(acct_name: str, proc_folders: list):
         smry['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
 
 
-def colorize_series(mail_items, color):
+def colorize_series(mail_items: list, color: str):
+    """Add the color category to all of the mail items in the list.
+
+    :param mail_items:
+    :param color:
+    """
     for mail_item in mail_items:
         add_categories_to_mail(mail_item, color)
 
 
-def get_mail_items_from_results(list_of_series):
+def get_mail_items_from_results(list_of_series) -> list:
     """Extract the w32com.CDispatch.client Outlook mail item from the list of Pandas' series."""
     mail_items = []
-    for row in list_of_series:
-        if len(row) > 1:
+    for p_row in list_of_series:
+        if len(p_row) > 1:
             lg.warning(f'mirs row list had more than a single item.')
-            pprint(row)
-        for rlist in row:
+            pprint(p_row)
+        for rlist in p_row:
             mail_items.append(rlist[1]['o_item'])
     return mail_items
 
 
-def clear_testing_colors(testing_series, testing_colors):
+def clear_testing_colors(testing_series: pd.Series, testing_colors: list) -> None:
+    """Remove the color categories from the mail items used in testing.
+
+    :param testing_series: series, the series that includes the mail items.
+    :param testing_colors: list, the colors to remove from the mail items.
+    """
     mitems = get_mail_items_from_results(testing_series)
     for mi in mitems:
         remove_categories_from_mail(mi, testing_colors)
 
 
 if __name__ == '__main__':
-    # display settings for development
+    # pandas display settings for development
     pd.set_option('display.max_rows', 100)
     pd.set_option('display.max_columns', 100)
     pd.set_option('display.width', 1000)
@@ -142,7 +149,6 @@ if __name__ == '__main__':
     # write the smry dictionary to a file to make it easier to look at
     import json
 
-    # global production_inbox_folders, smry
     account_name = acct_path_dct['account_name']
     production_inbox_folders = acct_path_dct['inbox_folders']
     # a summary debug info dictionary
