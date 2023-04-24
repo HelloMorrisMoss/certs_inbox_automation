@@ -88,9 +88,7 @@ class OutlookSingleton:
         pythoncom.CoInitialize()
 
     def __del__(self):
-        """
-        Uninitializes the COM library when the object is destroyed.
-        """
+        """Uninitializes the COM library when the object is destroyed."""
         pythoncom.CoUninitialize()
 
 

@@ -1,8 +1,8 @@
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Union, Tuple, Final
 
 from win32com import client as wclient
 
-color_map = {'red': 'Red Category',
+color_map: Final[dict] = {'red': 'Red Category',
              'orange': 'Orange Category',
              'yellow': 'Yellow Category',
              'olive': 'olive',
