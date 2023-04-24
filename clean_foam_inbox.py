@@ -86,7 +86,7 @@ def get_mail_items_from_inbox(olFolder: win32com.client.CDispatch) -> List[win32
 #     return results
 
 
-def process_mail_items(mail_items: list) -> list:
+def process_mail_items(mail_items: list, summary_dict=None) -> list:
     """Processes the given mail items, extracting relevant information and returning a list of dictionaries.
 
     :param mail_items: A list of win32com CDispatch objects representing the mail items.
@@ -114,9 +114,9 @@ def process_mail_items(mail_items: list) -> list:
                 continue
             row = {"received_time": received_time, "subject": subject, 'o_item': item} | subj_dict
             results.append(row)
-
-    smry['all_subj_lines'] += all_subj
-    smry['matched'] += matched_sub
+    if summary_dict is not None:
+        summary_dict['all_subj_lines'] += all_subj
+        summary_dict['matched'] += matched_sub
     return results
 
 
@@ -144,7 +144,7 @@ def sort_mail_items_to_dataframes(items, subject_pattern):
     return pd.DataFrame(items).sort_values('received_time', axis=0, ascending=True).reset_index()
 
 
-def get_process_folders_dfs(acct_name: str, proc_folders: list, folders_dict=None):
+def get_process_folders_dfs(acct_name: str, proc_folders: list, folders_dict=None, summary_dict=None):
     pf_dfs = []
     # get a dictionary of folders from the account
     for folder_path in proc_folders:
@@ -153,21 +153,20 @@ def get_process_folders_dfs(acct_name: str, proc_folders: list, folders_dict=Non
             lg.debug(f'{folder_path} was not found and will not be processed!')
             continue
         lg.debug(f'Processing folder: {folder_path}')
-        smry['checked_folders'][folder_path] = {'all_subj_lines': [], 'matched': []}
         items = olFolder.Items
         results = process_mail_items(items)
         if results:
             df = sort_mail_items_to_dataframes(results, subject_pattern)
 
-            if df.empty:
+            if not df.empty:
+                df['lot8'] = df['lot_number'].str[:8]
+                pf_dfs.append((df, folder_path))
+            else:
                 lg.debug(f'No results in {folder_path}')
-                continue
-            smry['checked_folders'][folder_path]['dfs'] = df
-            df['lot8'] = df['lot_number'].str[:8]
-            pf_dfs.append((df, folder_path))
+            if summary_dict is not None:
+                summary_dict['checked_folders'][folder_path] = {'all_subj_lines': [], 'matched': [], 'dfs': df}
         else:
             lg.debug(f'No results in {folder_path}')
-            continue
     return pf_dfs
 
 # def main_folders_process(acct_name: str, proc_folders: list, folders_dict=None):
@@ -188,18 +187,21 @@ def get_process_folders_dfs(acct_name: str, proc_folders: list, folders_dict=Non
 #             lg.debug(f'No results in {folder_path}')
 #             continue
 
-def group_foam_mail(df, folder_path):
+def group_foam_mail(df, folder_path, summary_dict=None):
     dfg = df.groupby(['product_number', 'so_number', 'lot8', 'c_number'])
     keep_item_rows = []
     move_item_rows = []
     for grp in dfg:
         keep_item_rows.append([item_row for item_row in grp[1].iloc[:1].iterrows()])  # .append([grp[1].iloc[0:1]])
         move_item_rows.append([item_row for item_row in grp[1].iloc[1:].iterrows()])
-    smry['checked_folders'][folder_path]['ibdf'] = df
-    smry['checked_folders'][folder_path]['dfg'] = dfg
-    smry['checked_folders'][folder_path]['keep_item_rows'] = keep_item_rows
-    smry['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
-
+    if summary_dict:
+        if summary_dict['checked_folders'].get(folder_path) is None:
+            summary_dict['checked_folders'][folder_path] = {}
+        summary_dict['checked_folders'][folder_path]['ibdf'] = df
+        summary_dict['checked_folders'][folder_path]['dfg'] = dfg
+        summary_dict['checked_folders'][folder_path]['keep_item_rows'] = keep_item_rows
+        summary_dict['checked_folders'][folder_path]['move_item_rows'] = move_item_rows
+    return move_item_rows, keep_item_rows, dfg
 
 def series_to_df(srs):
     return pd.DataFrame.from_dict({k: [v] for k, v in srs.to_dict().items()})
@@ -238,104 +240,95 @@ def clear_testing_colors(testing_series: pd.Series, testing_colors: list) -> Non
         remove_categories_from_mail(mi, testing_colors)
 
 
+def compare_keep_and_move(mirs, kirs, unmatched):
+    for mirow in mirs:
+        if not mirow:
+            continue  # skip empty lists
+        for idx, mirowrow in mirow:
+            matched = False
+            compare_columns = ('product_number', 'so_number', 'lot8', 'c_number')
+            mrdf = series_to_df(mirowrow)
+            match_cols = mrdf.loc[:, compare_columns]
+
+            for kir in kirs:
+                if len(kir) > 1:
+                    lg.warning(f'kir longer than 1: {kir}')
+                active_kir = kir[0][1]
+                # compare_kir = series_to_df(active_kir).loc[:, compare_columns]
+                missing_a_match_mail_df = pd.merge(mrdf, series_to_df(active_kir), on=compare_columns, how='inner')
+                df_is_empty = missing_a_match_mail_df.empty  # if it is empty, then there are no missing rows
+
+                if not df_is_empty:
+                    matched = True
+                    break
+            if not matched:
+                unmatched.append(mirowrow)
+                lg.debug(f'No match found for {mirowrow}')
+    return unmatched
+
+
+def color_foam_groups(dfg, move_items, move_item_color):
+    colorize_series(move_items, move_item_color)
+    for color, (group_name, group_df) in zip(valid_colors, dfg):
+        print(f'{color=}, {len(group_df)}')
+        for _, row in group_df.iterrows():
+            o_item = row['o_item']
+
+            print(f'{o_item.Subject=}, {o_item.Categories=}')
+            add_categories_to_mail(o_item, color)
+
+
+def clear_test_foam_group_colors(dfg, test_colors):
+    for color, (group_name, group_df) in zip(test_colors, dfg):
+        for _, row in group_df.iterrows():
+            o_item = row['o_item']
+            o_item.Categories = ''
+            o_item.Save()
+
+
 if __name__ == '__main__':
+    # ### this section is for development and demonstration only ###
+
     # pandas display settings for development
     pd.set_option('display.max_rows', 100)
     pd.set_option('display.max_columns', 100)
     pd.set_option('display.width', 1000)
 
-    # write the smry dictionary to a file to make it easier to look at
     import json
+    from helpers.outlook_helpers import valid_colors
 
-    account_name = acct_path_dct['account_name']
-    production_inbox_folders = acct_path_dct['inbox_folders']
     # a summary debug info dictionary
     smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[], matched=[], missing_a_match=[])
 
+    account_name = acct_path_dct['account_name']
+    production_inbox_folders = acct_path_dct['inbox_folders']
+
     found_folders_dict = find_folders_in_outlook(wc_outlook, account_name, production_inbox_folders)
-    # main_folders_process(acct_name=account_name, proc_folders=production_inbox_folders, folders_dict=found_folders_dict)
     pfdfs = get_process_folders_dfs(account_name, production_inbox_folders, found_folders_dict)
+    unmatched = []  # for checking for unmatched items
+    testing_colors_move = ['grey']
+    found_folders_keys = found_folders_dict.keys()
+
     for df, folder_path in pfdfs:
-        group_foam_mail(df, folder_path)
+        if folder_path in found_folders_keys:
+            move_item_rows, keep_item_rows, dfg = group_foam_mail(df, folder_path, smry)
+            unmatched = compare_keep_and_move(move_item_rows, keep_item_rows, unmatched)
+            move_items = get_mail_items_from_results(move_item_rows)
+            color_foam_groups(dfg, move_items, move_item_color=testing_colors_move)
+            pass
+            clear_test_foam_group_colors(dfg, test_colors=valid_colors)
+        else:
+            lg.warn(f'Missing {folder_path} in checked folders!')
 
-    # ### this section is for development and demonstration only ###
-    with open('./last_smry.json', 'w') as jf:
-        json.dump(smry, jf, indent=4, default=df_json_handler)
-
-    # check that the move rows all have keep rows to match
-    unmatched = []
-    for fp in production_inbox_folders:
-        if fp not in smry['checked_folders'].keys():
-            continue  # skip the ones that didn't have matches
-        if smry['checked_folders'][fp].get('move_item_rows') is None:
-            lg.debug(f'No move items for {fp}')
-            kirs = smry['checked_folders'][fp].get('keep_item_rows')
-            if kirs is not None:
-                lg.debug(f'{kirs=}')
-            continue
-        kirs = smry['checked_folders'][fp]['keep_item_rows']
-        mirs = smry['checked_folders'][fp]['move_item_rows']
-        for mirow in mirs:
-            if not mirow:
-                continue  # skip empty lists
-            for idx, mirowrow in mirow:
-                matched = False
-                compare_columns = ('product_number', 'so_number', 'lot8', 'c_number')
-                mrdf = series_to_df(mirowrow)
-                match_cols = mrdf.loc[:, compare_columns]
-
-                for kir in kirs:
-                    if len(kir) > 1:
-                        lg.warning(f'kir longer than 1: {kir}')
-                    active_kir = kir[0][1]
-                    compare_kir = series_to_df(active_kir).loc[:, compare_columns]
-                    missing_a_match_mail_df = pd.merge(mrdf, series_to_df(active_kir), on=compare_columns, how='inner')
-                    df_is_empty = missing_a_match_mail_df.empty  # if it is empty, then there are no missing rows
-
-                    if not df_is_empty:
-                        matched = True
-                        break
-                if not matched:
-                    unmatched.append(mirowrow)
-                    lg.debug(f'No match found for {mirowrow}')
     if unmatched:
         lg.debug('UNMATCHED!!')
         lg.debug(unmatched)
-    else:
-        lg.debug('All e-mails to be moved have a matched kept e-mail.')
+    pass  # for breakpoint
 
-        testing_colors_move = ['grey']
-        # testing_colors_keep = ['pink']
-        #
-        move_items = get_mail_items_from_results(mirs)
-        colorize_series(move_items, testing_colors_move)
-        # colorize_series(kirs, testing_colors_keep)
-        #
-        # if 'y' in input('clear testing colors?'):
-        #     # clear testing colors
-        #     clear_testing_colors(mirs, testing_colors_move)
-        #     clear_testing_colors(kirs, testing_colors_keep)
-        from helpers.outlook_helpers import valid_colors
-
-        # color the groups
-        dfg = smry['checked_folders']['\\\\SB-certs\\1-CERTS Inbox\\Automation Testing\\active_files\\Inbox']['dfg']
-        colorize_series(move_items, testing_colors_move)
-        for color, (group_name, group_df) in zip(valid_colors, dfg):
-            print(f'{color=}, {len(group_df)}')
-            for _, row in group_df.iterrows():
-                o_item = row['o_item']
-
-                print(f'{o_item.Subject=}, {o_item.Categories=}')
-                add_categories_to_mail(o_item, color)
-
-        # clear the category color groups
-        pass
-        for color, (group_name, group_df) in zip(valid_colors, dfg):
-            for _, row in group_df.iterrows():
-                o_item = row['o_item']
-                o_item.Categories = ''
-                o_item.Save()
+    # write the smry dictionary to a file to make it easier to look at
+    with open('./last_smry.json', 'w') as jf:
+        json.dump(smry, jf, indent=4, default=df_json_handler)
 
 # TODO: complete unit tests; next: a test confirming that the inbox looks like it does after "# color the groups"
 
-pass
+pass  # for breakpoint
