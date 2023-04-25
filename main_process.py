@@ -8,27 +8,28 @@ modifications:
 
 import pandas as pd
 
-from clean_foam_inbox import wc_outlook, get_process_folders_dfs
 from helpers.json_help import df_json_handler
 from helpers.outlook_helpers import find_folders_in_outlook, reset_testing_mods
 from log_setup import lg
-from mark_priority_emails import set_priority_customer_category
+from tasks.clean_foam_inbox import wc_outlook, get_process_folders_dfs
+from tasks.mark_priority_emails import set_priority_customer_category
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.development_node import ON_DEV_NODE
-from untracked_config.piority_shipment_customers import priority_flag_dict
+from untracked_config.priority_shipment_customers import priority_flag_dict
 
 if __name__ == '__main__':
     # ### some items in this section are for development and demonstration only ###
 
-    # pandas display settings for development
-    pd.set_option('display.max_rows', 100)
-    pd.set_option('display.max_columns', 100)
-    pd.set_option('display.width', 1000)
+    if ON_DEV_NODE:
+        # pandas display settings for development
+        pd.set_option('display.max_rows', 100)
+        pd.set_option('display.max_columns', 100)
+        pd.set_option('display.width', 1000)
 
-    # a summary debug info dictionary
-    smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[], matched=[], missing_a_match=[],
-                non_regex_matching_emails=[])
-    testing_colors_move = ['grey']
+        # a summary debug info dictionary
+        smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[], matched=[], missing_a_match=[],
+                    non_regex_matching_emails=[])
+        testing_colors_move = ['grey']
 
     # config data
     account_name = acct_path_dct['account_name']
