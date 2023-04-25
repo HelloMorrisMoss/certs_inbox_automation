@@ -7,7 +7,8 @@ from typing import List, Dict, Any
 import pandas as pd
 import win32com
 
-from helpers.outlook_helpers import add_categories_to_mail, remove_categories_from_mail
+from helpers.outlook_helpers import add_categories_to_mail, remove_categories_from_mail, colorize_outlook_email_list, \
+    clear_all_category_colors_foam
 from log_setup import lg
 from outlook_interface import wc_outlook
 from untracked_config.subject_regex import subject_pattern
@@ -94,6 +95,7 @@ def process_mail_items(mail_items: list, summary_dict=None) -> list:
     results: List[Dict[str, Any]] = []
     all_subj: List[str] = []
     matched_sub: List[str] = []
+    non_regex_matching_emails = []
     for item in mail_items:
         subject = item.Subject
         all_subj.append(subject)
@@ -112,9 +114,12 @@ def process_mail_items(mail_items: list, summary_dict=None) -> list:
                 continue
             row = {"received_time": received_time, "subject": subject, 'o_item': item} | subj_dict
             results.append(row)
+        else:
+            non_regex_matching_emails.append((subject, item))
     if summary_dict is not None:
         summary_dict['all_subj_lines'] += all_subj
         summary_dict['matched'] += matched_sub
+        summary_dict['non_regex_matching_emails'] = non_regex_matching_emails
     return results
 
 
@@ -205,17 +210,7 @@ def series_to_df(srs):
     return pd.DataFrame.from_dict({k: [v] for k, v in srs.to_dict().items()})
 
 
-def colorize_series(mail_items: list, color: str):
-    """Add the color category to all of the mail items in the list.
-
-    :param mail_items:
-    :param color:
-    """
-    for mail_item in mail_items:
-        add_categories_to_mail(mail_item, color)
-
-
-def get_mail_items_from_results(list_of_series) -> list:
+def get_mail_items_from_results(list_of_series, o_item_col='o_item') -> list:
     """Extract the w32com.CDispatch.client Outlook mail item from the list of Pandas' series."""
     mail_items = []
     for p_row in list_of_series:
@@ -223,7 +218,7 @@ def get_mail_items_from_results(list_of_series) -> list:
             lg.warning(f'mirs row list had more than a single item.')
             pprint(p_row)
         for rlist in p_row:
-            mail_items.append(rlist[1]['o_item'])
+            mail_items.append(rlist[1][o_item_col])
     return mail_items
 
 
@@ -266,7 +261,7 @@ def compare_keep_and_move(mirs, kirs, unmatched):
 
 
 def color_foam_groups(dfg, move_items, move_item_color, valid_colors):
-    colorize_series(move_items, move_item_color)
+    colorize_outlook_email_list(move_items, move_item_color)
     for color, (group_name, group_df) in zip(valid_colors, dfg):
         print(f'{color=}, {len(group_df)}')
         for _, row in group_df.iterrows():
@@ -276,10 +271,12 @@ def color_foam_groups(dfg, move_items, move_item_color, valid_colors):
             add_categories_to_mail(o_item, color)
 
 
-def clear_test_foam_group_colors(dfg, test_colors):
-    for color, (group_name, group_df) in zip(test_colors, dfg):
-        for _, row in group_df.iterrows():
-            o_item = row['o_item']
-            o_item.Categories = ''
-            o_item.Save()
+def process_foam_groups(df, folder_path, unmatched_foam_rows, testing_colors_move, valid_colors, smry=None):
 
+    move_item_rows, keep_item_rows, dfg = group_foam_mail(df, folder_path, smry)
+    unmatched_foam_rows = compare_keep_and_move(move_item_rows, keep_item_rows, unmatched_foam_rows)
+    move_items = get_mail_items_from_results(move_item_rows)
+    color_foam_groups(dfg, move_items, move_item_color=testing_colors_move, valid_colors=valid_colors)
+    pass
+    clear_all_category_colors_foam(dfg, test_colors=valid_colors)
+    return unmatched_foam_rows

@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Union, Tuple, Final
 
+import pandas as pd
 from win32com import client as wclient
 
 color_map: Final[dict] = {'red': 'Red Category',
@@ -108,7 +109,6 @@ def normalize_color_categories_list(categories: list):
             raise ValueError(f"{color} is not a valid color.")
         else:
             color_cat = color_map[color]
-            print(f'{color} being interpreted as {color_cat}')
             normalized_categories.append(color_cat)
     return normalized_categories
 
@@ -173,7 +173,48 @@ def find_folders_in_outlook(outlook_obj: wclient.CDispatch, store_name_filter: s
     target_store = get_store_by_name(store_name_filter, outlook_obj)
     parent_folder = target_store.GetRootFolder()
     map_folder_structure_to_flat_dict(folders_dict, parent_folder, must_find_list)
+
     for folder in must_find_list:
         if folder not in folders_dict.keys():
             raise Exception(f"Required folder '{folder}' not found!")
     return folders_dict
+
+
+def colorize_outlook_email_list(mail_items: list, color: str):
+    """Add the color category to all the mail items in the list.
+
+    :param mail_items: list, list of w32com.CDispatch.client Outlook mail items.
+    :param color: str, the color categories to set on the mail items.
+    """
+    for mail_item in mail_items:
+        add_categories_to_mail(mail_item, color)
+
+
+def clear_all_category_colors(o_item: wclient.CDispatch) -> None:
+    """Removes all categories from the mail items in the given DataFrameGroupBy object.
+
+    :param o_item: The mail item to remove the categories from.
+    """
+    o_item.Categories = ''
+    o_item.Save()
+
+
+def clear_all_category_colors_foam(dfg: List[Tuple[str, pd.DataFrame]]) -> None:
+    """Removes all categories from the mail items in the given DataFrameGroupBy object.
+
+    :param dfg: The DataFrameGroupBy object containing the mail items to remove the categories from.
+    :param test_colors: A list of category colors to remove from the mail items.
+    """
+    for group_name, group_df in dfg:
+        for _, row in group_df.iterrows():
+            o_item = row['o_item']
+            clear_all_category_colors(o_item)
+
+
+def clear_of_all_category_colors_from_list(o_items: List[wclient.CDispatch]) -> None:
+    """Removes all categories from the given list of mail items.
+
+    :param o_items: A list of mail items to remove the categories from.
+    """
+    for item in o_items:
+        clear_all_category_colors(item)

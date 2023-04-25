@@ -1,28 +1,18 @@
-from helpers.outlook_helpers import find_folders_in_outlook
-from outlook_interface import wc_outlook
-from untracked_config.accounts_and_folder_paths import acct_path_dct
+import pandas as pd
 
-ol_folders = wc_outlook.get_outlook_folders()
-account_name = acct_path_dct['account_name']
-production_inbox_folders = acct_path_dct['inbox_folders']
-found_folders_dict: dict = find_folders_in_outlook(ol_folders, account_name, production_inbox_folders)
+from helpers.outlook_helpers import colorize_outlook_email_list, clear_of_all_category_colors_from_list
 
 
-# class EventHandler:
-#     def OnNewMailEx(self, receivedItemsIDs):
-#         for ID in receivedItemsIDs.split(","):
-#             mail = wc_outlook.get_outlook().Session.GetItemFromID(ID)
-#             lg.debug(mail.Subject)
-#             mail.Categories = 'Blue Category'
-#
-# # create the event handler object
-# handler = EventHandler()
-#
-# fp = '\\\\SB-certs\\1-CERTS Inbox\\Automation Testing\\active_files\\Inbox'
-# inbox = found_folders_dict[fp]
-# # subscribe to the inbox events
-# lg.debug('adding handler')
-# inboxItems = inbox.Items
-# pythoncom.PumpMessages()
-# inboxItems.ItemAdd += handler.OnNewMailEx
-# lg.debug('event handler added')
+def set_priority_customer_category(df: pd.DataFrame, priority_flag_dict: dict, color_category: str = 'red') -> None:
+    """Sets the color category of mail items from priority customers in the given DataFrame to the specified color.
+
+    :param df: The DataFrame containing the mail items to filter and colorize.
+    :param priority_flag_dict: A dictionary containing the customer names to flag as highest priority.
+    :param color_category: The name of the color category to apply to the mail items (default is 'red').
+    """
+    # filter on priority customers
+    flag_df = df.loc[df.customer.str.match('|'.join(priority_flag_dict['highest'].keys()))]
+    # set priority customer e-mails to color category
+    colorize_outlook_email_list(flag_df['o_item'], color_category)
+    pass  # for development breakpoint
+    clear_of_all_category_colors_from_list(flag_df['o_item'])
