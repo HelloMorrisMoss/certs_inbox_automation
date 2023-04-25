@@ -271,12 +271,15 @@ def color_foam_groups(dfg, move_items, move_item_color, valid_colors):
             add_categories_to_mail(o_item, color)
 
 
-def process_foam_groups(df, folder_path, unmatched_foam_rows, testing_colors_move, valid_colors, smry=None):
+def process_foam_groups(df, folder_path, unmatched_foam_rows, testing_colors_move, valid_colors,
+                        destination_folder: win32com.client.Dispatch, smry=None):
 
     move_item_rows, keep_item_rows, dfg = group_foam_mail(df, folder_path, smry)
     unmatched_foam_rows = compare_keep_and_move(move_item_rows, keep_item_rows, unmatched_foam_rows)
-    move_items = get_mail_items_from_results(move_item_rows)
-    color_foam_groups(dfg, move_items, move_item_color=testing_colors_move, valid_colors=valid_colors)
+    move_items: list = get_mail_items_from_results(move_item_rows)
+    # color_foam_groups(dfg, move_items, move_item_color=testing_colors_move, valid_colors=valid_colors)
+    from helpers.outlook_helpers import move_mail_items_to_folder
+    move_mail_items_to_folder(move_items, destination_folder)
     pass
-    clear_all_category_colors_foam(dfg, test_colors=valid_colors)
+    clear_all_category_colors_foam(dfg)
     return unmatched_foam_rows

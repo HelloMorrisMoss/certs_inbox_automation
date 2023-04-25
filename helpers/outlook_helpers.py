@@ -16,6 +16,8 @@ color_map: Final[dict] = {'red': 'Red Category',
 valid_colors = color_map.keys()
 valid_categories = color_map.values()
 
+default_follow_up_text = 'Follow up'
+
 
 def add_categories_to_mail(mail: wclient.CDispatch, categories: Union[str, List[str]]) -> None:
     """Add categories to an Outlook mail item.
@@ -218,3 +220,44 @@ def clear_of_all_category_colors_from_list(o_items: List[wclient.CDispatch]) -> 
     """
     for item in o_items:
         clear_all_category_colors(item)
+
+
+def move_mail_items_to_folder(mail_items_list: List[wclient.CDispatch], destination_folder: wclient.Dispatch):
+    """Moves the given list of mail items to the specified destination folder.
+
+    :param mail_items_list: The list of mail items to be moved.
+    :param destination_folder: The CDispatch object of the destination folder.
+    """
+    for mail in mail_items_list:
+        mail.move(destination_folder)
+
+
+def set_follow_up_on_list(item_list: List[wclient.CDispatch], follow_up_text: str = default_follow_up_text):
+    """Sets a follow-up flag on the given list of mail items.
+
+    :param item_list: The list of mail items to set the follow-up flag on.
+    :param follow_up_text: The text for the follow-up flag. If not provided, it will use the default text.
+    """
+    for item in item_list:
+        set_follow_up(item, follow_up_text)
+
+
+def set_follow_up(mail_item: wclient.CDispatch, follow_up_text: str = default_follow_up_text):
+    """Sets a follow-up flag on the given mail item.
+
+    :param mail_item: The mail item to set the follow-up flag on.
+    :param follow_up_text: The text for the follow-up flag. If not provided, it will use the default text.
+    """
+    mail_item.FlagRequest = follow_up_text
+    mail_item.save()
+
+
+def reset_testing_mods(mail_list: List[wclient.CDispatch]):
+    """Resets any testing modifications made to the given list of mail items.
+
+    This function clears all color categories and removes any follow-up flags.
+
+    :param mail_list: The list of mail items to reset the modifications on.
+    """
+    clear_of_all_category_colors_from_list(mail_list)
+    set_follow_up_on_list(mail_list, '')
