@@ -1,5 +1,6 @@
 """Contains the logger setup and a simple script to read the log file into a pandas dataframe."""
 import logging
+import os
 import sys
 from logging.handlers import RotatingFileHandler
 
@@ -25,7 +26,7 @@ class BreadcrumbFilter(logging.Filter):
         return True
 
 
-def setup_logger():
+def setup_logger(log_file_path: str = './logs/program.log'):
     # set up the base logger
     logr = logging.getLogger()
     base_log_level = logging.DEBUG if ON_DEV_NODE else logging.INFO
@@ -40,7 +41,10 @@ def setup_logger():
     logr.addHandler(c_handler)
 
     # file logger
-    f_handler = RotatingFileHandler('./logs/program.log', maxBytes=2000000)
+    log_dir = os.path.dirname(log_file_path)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    f_handler = RotatingFileHandler(log_file_path, maxBytes=2000000)
     f_handler.setLevel(base_log_level)
     f_string = '"%(asctime)s","%(name)s", "%(breadcrumbs)s","%(funcName)s","%(lineno)d","%(levelname)s","%(message)s"'
     f_format = logging.Formatter(f_string)
