@@ -1,10 +1,15 @@
-"""Collecting cert PDFs for later study."""
+"""For collecting cert PDFs for later study.
+
+This saves PDFs attached to emails in the specified folder creating a folder for each using the subject line of the
+email as the folder name. Characters that cannot be used in folder names are replaced with unicode Greek letters.
+"""
 
 import os
 
 import win32com.client as win32
 
-from untracked_config.accounts_and_folder_paths import production_inbox_folders
+from log_setup import lg
+from untracked_config.accounts_and_folder_paths import production_inbox_folders, acct_path_dct
 
 
 class PathConverter:
@@ -38,13 +43,6 @@ class PathConverter:
 
 
 def export_pdfs_from_inbox():
-    # Set the file path to write any errors to
-    file_path = "C:/Users/lmcglaughlin/Downloads/certs_pdfs_from_inbox/ErrorLog.txt"
-
-    # Create a file system object and open the output file
-    fso = win32.Dispatch("Scripting.FileSystemObject")
-    output_file = fso.CreateTextFile(file_path, True)
-
     # Get the Outlook application and namespace objects
     ol_app = win32.Dispatch("Outlook.Application")
     ol_namespace = ol_app.GetNamespace("MAPI")
@@ -65,8 +63,7 @@ def export_pdfs_from_inbox():
         break  # Outer loop broken, inbox folder found
     else:
         # Inbox folder not found
-        output_file.WriteLine("ERROR: Inbox folder not found.")
-        print("Inbox folder not found.")
+        lg.error("Inbox folder not found.")
         return
 
     # Loop through each email in the inbox folder
@@ -75,12 +72,12 @@ def export_pdfs_from_inbox():
         email = inbox_folder.items(i)
 
         # Check if the email is from the desired sender
-        if email.SenderEmailAddress == "CofC@nitto.com":
+        if email.SenderEmailAddress == acct_path_dct['origin_email_address']:
             # Convert the subject to a folder name
             folder_name = path_converter.to_path(email.Subject)
 
             # Create the folder if it does not already exist
-            folder_path = os.path.join("C:/Users/lmcglaughlin/Downloads/certs_pdfs_from_inbox/", folder_name)
+            folder_path = os.path.join(acct_path_dct['local_save_folder_path'], folder_name)
             os.makedirs(folder_path, exist_ok=True)
 
             # Loop through each attachment in the email
@@ -91,16 +88,12 @@ def export_pdfs_from_inbox():
                     try:
                         attachment.SaveAsFile(os.path.join(folder_path, attachment.FileName))
                     except Exception as e:
-                        output_file.WriteLine(
+                        lg.error(
                             f"ERROR saving attachment from email with subject '{email.Subject}': {e}"
                         )
 
             # # Convert the folder name back to the subject
             # subject_line = path_converter.from_path(folder_name)
 
-    # Close the output file
-    output_file.Close()
-
     # Display a message box indicating the export is complete
     win32.MessageBox(None, "PDFs exported from inbox successfully.", "Export Complete", win32.MB_ICONINFORMATION)
-

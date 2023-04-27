@@ -10,9 +10,11 @@ if ON_DEV_NODE:
 
     acct_path_dct = {
         "account_name": "account_name",
+        "origin_email_address": "source_email@address.com",
         "sent_items_folder": r'\\account_name\Sent Items',
         "inbox_folders": development_inbox_folders,
         "target_folder_path": r'\\account_name\Inbox\Foam Duplicate Lots',
+        "local_save_folder_path": "dev/local/files",
         }
 else:
     production_inbox_folders = [r'\\account_name\1-Specific Inbox', r'\\account_name\Inbox']  # live folders
@@ -20,7 +22,9 @@ else:
 
     acct_path_dct = {
         "account_name": "account_name",
+        "origin_email_address": "source_email@address.com",
         "sent_items_folder": r'\\account_name\Sent Items',
         "inbox_folders": production_inbox_folders,
         "target_folder_path": r'\\account_name\Inbox\Foam Duplicate Lots',
+        "local_save_folder_path": "./local_files/",
         }
