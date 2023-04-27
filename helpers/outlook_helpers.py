@@ -205,7 +205,6 @@ def clear_all_category_colors_foam(dfg: List[Tuple[str, pd.DataFrame]]) -> None:
     """Removes all categories from the mail items in the given DataFrameGroupBy object.
 
     :param dfg: The DataFrameGroupBy object containing the mail items to remove the categories from.
-    :param test_colors: A list of category colors to remove from the mail items.
     """
     for group_name, group_df in dfg:
         for _, row in group_df.iterrows():
@@ -232,14 +231,23 @@ def move_mail_items_to_folder(mail_items_list: List[wclient.CDispatch], destinat
         mail.move(destination_folder)
 
 
-def set_follow_up_on_list(item_list: List[wclient.CDispatch], follow_up_text: str = default_follow_up_text):
-    """Sets a follow-up flag on the given list of mail items.
+def set_follow_up_on_list(item_list: List[wclient.CDispatch], follow_up_text: str = default_follow_up_text,
+                          overwrite_if_set: bool = False) -> None:
+    """Sets a follow-up flag on the given list of mail items. By default, will not overwrite any existing follow-up.
 
     :param item_list: The list of mail items to set the follow-up flag on.
     :param follow_up_text: The text for the follow-up flag. If not provided, it will use the default text.
+    :param overwrite_if_set: bool, whether to overwrite existing follow-up status that may be set. Default False.
     """
+    change_setting = False
     for item in item_list:
-        set_follow_up(item, follow_up_text)
+        if overwrite_if_set:  # always overwrite don't check
+            change_setting = True
+        elif not is_follow_up_set(item):  # check for existing follow-up
+            change_setting = True
+
+        if change_setting:
+            set_follow_up(item, follow_up_text)
 
 
 def set_follow_up(mail_item: wclient.CDispatch, follow_up_text: str = default_follow_up_text):
@@ -261,3 +269,17 @@ def reset_testing_mods(mail_list: List[wclient.CDispatch]):
     """
     clear_of_all_category_colors_from_list(mail_list)
     set_follow_up_on_list(mail_list, '')
+
+
+def is_follow_up_set(outlook_mail_item: wclient.CDispatch) -> bool:
+    """Returns True if the given Outlook mail item has a follow-up flag set; otherwise, returns False.
+
+    :param outlook_mail_item: The Outlook mail item to check for a follow-up flag.
+    :type outlook_mail_item: Dispatch
+    :return: True if the mail item has a follow-up flag set, False otherwise.
+    :rtype: bool
+    """
+    if any([outlook_mail_item.FlagRequest, outlook_mail_item.FlagStatus]):
+        return True
+    else:
+        return False
