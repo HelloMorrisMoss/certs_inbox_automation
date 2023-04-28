@@ -1,4 +1,5 @@
 """Contains the logger setup and a simple script to read the log file into a pandas dataframe."""
+
 import logging
 import os
 import sys

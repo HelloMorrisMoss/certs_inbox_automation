@@ -21,6 +21,7 @@ if __name__ == '__main__':
     # ### some items in this section are for development and demonstration only ###
 
     if ON_DEV_NODE:
+        lg.debug('Running on the development system.')
         # pandas display settings for development
         pd.set_option('display.max_rows', 100)
         pd.set_option('display.max_columns', 100)
@@ -30,6 +31,8 @@ if __name__ == '__main__':
         smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[], matched=[], missing_a_match=[],
                     non_regex_matching_emails=[])
         testing_colors_move = ['grey']
+    else:
+        lg.info('Running on a PRODUCTION system.')
 
     # config data
     account_name = acct_path_dct['account_name']
@@ -41,10 +44,12 @@ if __name__ == '__main__':
     unmatched_foam_rows = []  # for checking for unmatched items
     found_folders_keys = found_folders_dict.keys()
 
+    lg.info('Folders found: %s', found_folders_keys if found_folders_keys else None)
     # process mail items
     for df, folder_path in pfdfs:
+        lg.info('Processing %s', folder_path)
         if folder_path in found_folders_keys:
-
+            lg.info('Setting follow up flags on priority customer items.')
             set_priority_customer_category(df, priority_flag_dict, True)
             if ON_DEV_NODE:
                 reset_testing_mods(df['o_item'])
