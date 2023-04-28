@@ -5,6 +5,9 @@ import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
 
+from untracked_config.scheduling_data import PYTHON_EXE_PATH, MAIN_PROCESS_DIR_PATH, MAIN_PROCESS_FILENAME, \
+    SCHEDULING_PARAMETERS
+
 
 # define a function to start the scheduler in a separate thread
 def start_scheduler():
@@ -13,10 +16,10 @@ def start_scheduler():
 
     # define the job function to run main_process.py in a new process
     def run_main_process():
-        subprocess.Popen(['C:\\Users\\lmcglaughlin\\PycharmProjects\\outlook_data\\venv\\Scripts\\python.exe', 'main_process.py'], cwd='C:\\Users\\lmcglaughlin\\PycharmProjects\\outlook_data')
+        subprocess.Popen([PYTHON_EXE_PATH, MAIN_PROCESS_FILENAME], cwd=MAIN_PROCESS_DIR_PATH)
 
-    # add the job to the scheduler to run every 5 minutes between 7:00 AM and 7:00 PM, Monday through Friday
-    scheduler.add_job(run_main_process, 'cron', minute='*/5', hour='7-18', day_of_week='mon-fri', max_instances=1)
+    # add the job to the scheduler using the scheduling parameters from the configuration file
+    scheduler.add_job(run_main_process, **SCHEDULING_PARAMETERS)
 
     # start the scheduler
     scheduler.start()
