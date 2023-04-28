@@ -1,3 +1,4 @@
+APScheduler==3.10.1
 contourpy==1.0.7
 cycler==0.11.0
 fonttools==4.39.2
@@ -13,6 +14,9 @@ pyparsing==3.0.9
 python-dateutil==2.8.2
 python-Levenshtein==0.21.0
 pytz==2022.7.1
+pytz-deprecation-shim==0.1.0.post0
 pywin32==305
 rapidfuzz==3.0.0
 six==1.16.0
+tzdata==2023.3
+tzlocal==4.3
