@@ -56,10 +56,6 @@ if __name__ == '__main__':
                     reset_testing_mods(df['o_item'])
                 # todo: tests for priority category customers
 
-                # unmatched_foam_rows = process_foam_groups(df, folder_path, unmatched_foam_rows,
-                #                                           testing_colors_move, valid_colors,
-                #                                           found_folders_dict[''], smry)
-
             else:
                 lg.warn(f'Missing {folder_path} in checked folders!')
 
@@ -78,12 +74,13 @@ if __name__ == '__main__':
     except Exception as err:
         stack_trace_str = traceback.format_exc()
         lg.error(stack_trace_str)
-        try:
-            from development_files.email_alert import send_alert
+        if not ON_DEV_NODE:
+            try:
+                from development_files.email_alert import send_alert
 
-            send_alert(subject='Certs_inbox_automation has encountered an unhandled error!', body=stack_trace_str)
-        except Exception as em_exc:
-            lg.error(traceback.format_exc())
+                send_alert(subject='Certs_inbox_automation has encountered an unhandled error!', body=stack_trace_str)
+            except Exception as em_exc:
+                lg.error(traceback.format_exc())
 
 # TODO: complete unit tests; next: a test confirming that the inbox looks like it does after "# color the groups"
 
