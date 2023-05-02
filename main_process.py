@@ -10,13 +10,11 @@ import traceback
 import pandas as pd
 
 from helpers.json_help import df_json_handler
-from helpers.outlook_helpers import find_folders_in_outlook, reset_testing_mods
+from helpers.outlook_helpers import find_folders_in_outlook, reset_testing_mods, valid_colors
 from log_setup import lg
-from tasks.clean_foam_inbox import wc_outlook, get_process_folders_dfs
-from tasks.mark_priority_emails import set_priority_customer_category
+from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups, wc_outlook
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.development_node import ON_DEV_NODE
-from untracked_config.priority_shipment_customers import priority_flag_dict
 
 if __name__ == '__main__':
         # ### some items in this section are for development and demonstration only ###
@@ -81,7 +79,9 @@ if __name__ == '__main__':
                 send_alert(subject='Certs_inbox_automation has encountered an unhandled error!', body=stack_trace_str)
             except Exception as em_exc:
                 lg.error(traceback.format_exc())
-
+    finally:
+        lg.debug('Deleting Outlook com instance.')
+        del(wc_outlook)
 # TODO: complete unit tests; next: a test confirming that the inbox looks like it does after "# color the groups"
 
 pass  # for breakpoint

@@ -3,6 +3,8 @@ from typing import Dict, List, Optional, Union, Tuple, Final
 import pandas as pd
 from win32com import client as wclient
 
+from outlook_interface import wc_outlook
+
 color_map: Final[dict] = {'red': 'Red Category',
              'orange': 'Orange Category',
              'yellow': 'Yellow Category',
@@ -162,7 +164,7 @@ def map_folder_structure_to_flat_dict(folders_dict: Dict[str, any], parent_folde
 
 
 def find_folders_in_outlook(outlook_obj: wclient.CDispatch, store_name_filter: str, must_find_list: List[str] = '',
-                            map_all=False) -> Dict[str, any]:
+                            map_all=False, tries: int = 2) -> Dict[str, any]:
     """Get outlook folders in a dictionary from an Outlook object for a specified account.
 
     Searches for all folders within Outlook stores whose display names contain the specified
@@ -178,7 +180,12 @@ def find_folders_in_outlook(outlook_obj: wclient.CDispatch, store_name_filter: s
 
     for folder in must_find_list:
         if folder not in folders_dict.keys():
-            raise Exception(f"Required folder '{folder}' not found!")
+            if tries:
+                tries -= 1
+                folders_dict = find_folders_in_outlook(outlook_obj, store_name_filter, must_find_list, map_all, tries)
+            else:
+                wc_outlook.reset_outlook()
+                raise Exception(f"Required folder '{folder}' not found!")
     return folders_dict
 
 
