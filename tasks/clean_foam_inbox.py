@@ -2,93 +2,22 @@
 
 import datetime
 from pprint import pprint
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import pandas as pd
 import win32com
 
-from helpers.outlook_helpers import add_categories_to_mail, remove_categories_from_mail, colorize_outlook_email_list, \
-    clear_all_category_colors_foam
+from helpers.outlook_helpers import add_categories_to_mail, colorize_outlook_email_list, move_mail_items_to_folder, \
+    remove_categories_from_mail
 from log_setup import lg
-from outlook_interface import wc_outlook
 from untracked_config.subject_regex import subject_pattern
-
-now = datetime.datetime.now()
-lg.debug(f'Starting at {now}')
-
-wc_outlook = wc_outlook.get_outlook_folders()
-
-
-def get_mail_items_from_inbox(olFolder: win32com.client.CDispatch) -> List[win32com.client.CDispatch]:
-    """
-    Returns a list of mail items in the specified Outlook folder.
-
-    :param olFolder: The Outlook folder to retrieve mail items from.
-    :return: A list of win32com CDispatch objects representing the mail items in the folder.
-    """
-    return olFolder.Items
-
-
-# def sort_mail_items_by_subject(mail_items: List[win32com.client.CDispatch], subject_regex: subject_pattern) -> Tuple[
-#     List[Dict[str, Any]], List[str]]:
-#     """
-#     Sorts a list of mail items into two lists based on whether their subject line matches the specified regex.
-#
-#     :param mail_items: A list of win32com CDispatch objects representing the mail items to sort.
-#     :param subject_regex: A compiled regular expression pattern to match against the mail item subject lines.
-#     :return: A tuple containing a list of dictionaries representing the matched mail items, and a list of all subject lines.
-#     """
-#     matched_results = []
-#     all_subject_lines = []
-#     for item in mail_items:
-#         subject = item.Subject
-#         all_subject_lines.append(subject)
-#         match = subject_regex.match(subject)
-#         if match:
-#             subj_dict: dict = match.groupdict()
-#             if subj_dict['product_number'] in product_names and subj_dict['c_number'] in dedupe_cnums:
-#                 # pandas needs datetime.datetime not pywintypes.datetime
-#                 received_time = datetime.datetime.fromtimestamp(item.ReceivedTime.timestamp() + 14400)  # it's in UTC
-#                 if received_time is None:
-#                     lg.debug(f'No rec time on {subject}')
-#                     continue
-#                 row = {"received_time": received_time, "subject": subject, 'o_item': item} | subj_dict
-#                 matched_results.append(row)
-#
-#     return matched_results, all_subject_lines
-
-
-# def process_mail_items(mail_items: List[win32com.client.CDispatch], subject_regex: subject_pattern) -> List[
-#     Dict[str, Any]]:
-#     """
-#     Processes a list of mail items by filtering and extracting relevant information.
-#
-#     :param mail_items: A list of win32com CDispatch objects representing the mail items to process.
-#     :param subject_regex: A compiled regular expression pattern to match against the mail item subject lines.
-#     :return: A list of dictionaries representing the processed mail items.
-#     """
-#     results = []  # list of
-#     for item in mail_items:
-#         subject = item.Subject
-#         match = subject_regex.match(subject)
-#         if match:
-#             subj_dict: dict = match.groupdict()
-#             # if subj_dict['product_number'] in product_names and subj_dict['c_number'] in dedupe_cnums:
-#             # pandas needs datetime.datetime not pywintypes.datetime
-#             received_time = datetime.datetime.fromtimestamp(item.ReceivedTime.timestamp() + 14400)  # it's in UTC
-#             if received_time is None:
-#                 lg.debug(f'No rec time on {subject}')
-#                 continue
-#             row = {"received_time": received_time, "subject": subject, 'o_item': item} | subj_dict
-#             results.append(row)
-#
-#     return results
 
 
 def process_mail_items(mail_items: list, summary_dict=None) -> list:
     """Processes the given mail items, extracting relevant information and returning a list of dictionaries.
 
     :param mail_items: A list of win32com CDispatch objects representing the mail items.
+    :param summary_dict: dict, a dictionary for storing development/debugging information from the process.
     :return: A list of dictionaries representing the mail items, with keys for 'received_time', 'subject', and other
         extracted information.
     """
@@ -271,15 +200,24 @@ def color_foam_groups(dfg, move_items, move_item_color, valid_colors):
             add_categories_to_mail(o_item, color)
 
 
-def process_foam_groups(df, folder_path, unmatched_foam_rows, testing_colors_move, valid_colors,
-                        destination_folder: win32com.client.Dispatch, smry=None):
+def process_foam_groups(df, current_folder_path: str, unmatched_foam_rows, testing_colors_move,
+                        valid_colors, destination_folder: win32com.client.Dispatch, smry=None):
+    # get lists of mail to move and leave and a pandas.DataFrame.GroupBy
+    item_rows_to_move, item_rows_to_keep, dfg = group_foam_mail(df, current_folder_path, smry)
 
-    move_item_rows, keep_item_rows, dfg = group_foam_mail(df, folder_path, smry)
-    unmatched_foam_rows = compare_keep_and_move(move_item_rows, keep_item_rows, unmatched_foam_rows)
-    move_items: list = get_mail_items_from_results(move_item_rows)
+    # check for move mail without a keep
+    unmatched_foam_rows: list = compare_keep_and_move(item_rows_to_move, item_rows_to_keep, unmatched_foam_rows)
+    if unmatched_foam_rows:
+        lg.warn('Unmatched rows: %s', unmatched_foam_rows)
+        raise RuntimeError('Unmatched rows found in ')
+
+    # get the mail items from the dataframe
+    move_items: list = get_mail_items_from_results(item_rows_to_move)
+    # for development, color code the groups and items to move
     # color_foam_groups(dfg, move_items, move_item_color=testing_colors_move, valid_colors=valid_colors)
-    from helpers.outlook_helpers import move_mail_items_to_folder
+
+    # move the duplicates
     move_mail_items_to_folder(move_items, destination_folder)
     pass
-    clear_all_category_colors_foam(dfg)
+    # clear_all_category_colors_foam(dfg)
     return unmatched_foam_rows

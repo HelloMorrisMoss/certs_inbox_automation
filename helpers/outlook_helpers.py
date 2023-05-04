@@ -1,6 +1,7 @@
-from typing import Dict, List, Optional, Union, Tuple, Final
+from typing import Dict, Final, List, Optional, Tuple, Union
 
 import pandas as pd
+import pywintypes
 from win32com import client as wclient
 
 from outlook_interface import wc_outlook
@@ -225,7 +226,10 @@ def clear_of_all_category_colors_from_list(o_items: List[wclient.CDispatch]) -> 
     :param o_items: A list of mail items to remove the categories from.
     """
     for item in o_items:
-        clear_all_category_colors(item)
+        try:
+            clear_all_category_colors(item)
+        except pywintypes.com_error as pycom_err:
+            print('Item "has been deleted" probably moved.')
 
 
 def move_mail_items_to_folder(mail_items_list: List[wclient.CDispatch], destination_folder: wclient.Dispatch):
@@ -254,7 +258,10 @@ def set_follow_up_on_list(item_list: List[wclient.CDispatch], follow_up_text: st
             change_setting = True
 
         if change_setting:
-            set_follow_up(item, follow_up_text)
+            try:
+                set_follow_up(item, follow_up_text)
+            except pywintypes.com_error as pycom_err:
+                print('Item "has been deleted" probably moved.')
 
 
 def set_follow_up(mail_item: wclient.CDispatch, follow_up_text: str = default_follow_up_text):

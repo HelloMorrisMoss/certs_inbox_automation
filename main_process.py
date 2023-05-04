@@ -5,19 +5,26 @@ modifications:
 * put a follow-up flag on items from prioritized customer shipments
 * WIP: move duplicate foam certs out of the main inbox
 """
+import datetime
 import traceback
 
 import pandas as pd
 
 from helpers.json_help import df_json_handler
-from helpers.outlook_helpers import find_folders_in_outlook, reset_testing_mods, valid_colors
+from helpers.outlook_helpers import find_folders_in_outlook, valid_colors
 from log_setup import lg
-from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups, wc_outlook
+from outlook_interface import wc_outlook
+from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups
+from tasks.mark_priority_emails import set_priority_customer_category
 from untracked_config.accounts_and_folder_paths import acct_path_dct
+from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
 from untracked_config.development_node import ON_DEV_NODE
+from untracked_config.priority_shipment_customers import priority_flag_dict
 
 if __name__ == '__main__':
-        # ### some items in this section are for development and demonstration only ###
+    # ### some items in this section are for development and demonstration only ###
+    now = datetime.datetime.now()
+    lg.debug(f'Starting at {now}')
     try:
         if ON_DEV_NODE:
             lg.debug('Running on the development system.')
@@ -38,24 +45,30 @@ if __name__ == '__main__':
         production_inbox_folders = acct_path_dct['inbox_folders']
 
         # get current folder data
-        found_folders_dict: dict = find_folders_in_outlook(wc_outlook, account_name, production_inbox_folders)
+        found_folders_dict: dict = find_folders_in_outlook(wc_outlook.get_outlook_folders(),
+                                                           account_name, production_inbox_folders)
         pfdfs: list = get_process_folders_dfs(account_name, production_inbox_folders, found_folders_dict)
         unmatched_foam_rows = []  # for checking for unmatched items
         found_folders_keys = found_folders_dict.keys()
+        move_folder_com = found_folders_dict[acct_path_dct['target_folder_path']]
 
         lg.info('Folders found: %s', found_folders_keys if found_folders_keys else None)
         # process mail items
-        for df, folder_path in pfdfs:
-            lg.info('Processing %s', folder_path)
-            if folder_path in found_folders_keys:
+        for df, this_folder_path in pfdfs:
+            lg.info('Processing %s', this_folder_path)
+            if this_folder_path in found_folders_keys:
                 lg.info('Setting follow up flags on priority customer items.')
                 set_priority_customer_category(df, priority_flag_dict, True)
-                if ON_DEV_NODE:
-                    reset_testing_mods(df['o_item'])
+                unmatched_foam_rows = process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
+                                                          unmatched_foam_rows, testing_colors_move, valid_colors,
+                                                          move_folder_com, smry)
+
+                # if ON_DEV_NODE:
+                #     reset_testing_mods(df['o_item'])
                 # todo: tests for priority category customers
 
             else:
-                lg.warn(f'Missing {folder_path} in checked folders!')
+                lg.warn(f'Missing {this_folder_path} in checked folders!')
 
         if unmatched_foam_rows:
             lg.warn('UNMATCHED ROWS FOR FOAM DUPLICATES!!')
