@@ -1,0 +1,6 @@
+{"email settings": {
+        "smtp server": "1.2.3.4",
+        "sender name": "NoReply@Domain.com",
+        "recipient_list": "someone.email@Domain.com"
+    }
+}
