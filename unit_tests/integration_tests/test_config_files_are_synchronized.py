@@ -5,10 +5,18 @@ import unittest
 
 import untracked_config.accounts_and_folder_paths as afp
 import untracked_config.accounts_and_folder_paths_template as afp_t
-from untracked_config.auto_dedupe_cust_ids import dedupe_cnums as cnums
-from untracked_config.auto_dedupe_cust_ids_template import dedupe_cnums as cnums_t
-from untracked_config.development_node import ON_DEV_NODE as odn
-from untracked_config.development_node_template import ON_DEV_NODE as odn_t
+import untracked_config.auto_dedupe_cust_ids as cnums
+import untracked_config.auto_dedupe_cust_ids_template as cnums_t
+import untracked_config.development_node as odn
+import untracked_config.development_node_template as odn_t
+import untracked_config.foam_clean_product_names as fcpn
+import untracked_config.foam_clean_product_names_template as fcpn_t
+import untracked_config.priority_shipment_customers as psc
+import untracked_config.priority_shipment_customers_template as psc_t
+import untracked_config.scheduling_data as schd
+import untracked_config.scheduling_data_template as schd_t
+import untracked_config.subject_regex as sbjre
+import untracked_config.subject_regex_template as sbjre_t
 
 
 def test_sync(config_module, template_module):
@@ -51,6 +59,18 @@ class TestSynchronization(unittest.TestCase):
 
     def test_on_dev_node(self):
         test_sync(odn, odn_t)
+
+    def test_foam_clean_product_names(self):
+        test_sync(fcpn, fcpn_t)
+
+    def test_priority_shipment_customers(self):
+        test_sync(psc, psc_t)
+
+    def test_scheduling_data(self):
+        test_sync(schd, schd_t)
+
+    def test_subject_regex(self):
+        test_sync(sbjre, sbjre_t)
 
     def test_email_json(self):
         prefix = '../../'
