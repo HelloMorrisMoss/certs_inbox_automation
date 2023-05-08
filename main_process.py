@@ -35,9 +35,9 @@ if __name__ == '__main__':
 
             # a summary debug info dictionary
             smry = dict(checked_folders={}, skipped_folders=[], all_subj_lines=[], matched=[], missing_a_match=[],
-                        non_regex_matching_emails=[])
-            testing_colors_move = ['grey']
+                        non_regex_matching_emails=[], testing_colors_move=['grey'], valid_colors=valid_colors)
         else:
+            smry = dict()
             lg.info('Running on a PRODUCTION system.')
 
         # config data
@@ -59,24 +59,12 @@ if __name__ == '__main__':
             if this_folder_path in found_folders_keys:
                 lg.info('Setting follow up flags on priority customer items.')
                 set_priority_customer_category(df, priority_flag_dict, True)
-                unmatched_foam_rows = process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
-                                                          unmatched_foam_rows, testing_colors_move, valid_colors,
-                                                          move_folder_com, smry)
-
-                # if ON_DEV_NODE:
-                #     reset_testing_mods(df['o_item'])
-                # todo: tests for priority category customers
-
+                process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
+                                    move_folder_com, smry)
             else:
                 lg.warn(f'Missing {this_folder_path} in checked folders!')
 
-        if unmatched_foam_rows:
-            lg.warn('UNMATCHED ROWS FOR FOAM DUPLICATES!!')
-            lg.debug(unmatched_foam_rows)
-        pass  # for breakpoint
-
-        # write the smry dictionary to a file to make it easier to look at
-        if ON_DEV_NODE:
+        if ON_DEV_NODE: # write the smry dictionary to a file to make it easier to look at
             import json
             with open('./last_smry.json', 'w') as jf:
                 json.dump(smry, jf, indent=4, default=df_json_handler)

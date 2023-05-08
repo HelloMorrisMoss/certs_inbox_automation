@@ -39,7 +39,7 @@ def test_sync(config_module, template_module):
             test_dict_sync(var_config, var_template, var_name)
 
 
-def test_dict_sync(var_config, var_template, var_name):
+def test_dict_sync(var_config, var_template, var_name=''):
     assert isinstance(var_template, dict), f"Type of {var_name} is different in config and template module"
     assert var_config.keys() == var_template.keys(), f"Keys of dictionary {var_name} don't match in config" \
                                                      f" and template module"
