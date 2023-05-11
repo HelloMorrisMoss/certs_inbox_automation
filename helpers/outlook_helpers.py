@@ -4,6 +4,8 @@ import pandas as pd
 import pywintypes
 from win32com import client as wclient
 
+from outlook_interface import wc_outlook
+
 color_map: Final[dict] = {'red': 'Red Category',
              'orange': 'Orange Category',
              'yellow': 'Yellow Category',
@@ -184,7 +186,7 @@ def find_folders_in_outlook(outlook_obj: wclient.CDispatch, store_name_filter: s
                 tries -= 1
                 folders_dict = find_folders_in_outlook(outlook_obj, store_name_filter, must_find_list, map_all, tries)
             else:
-                # wc_outlook.reset_outlook()
+                wc_outlook.reset_outlook()
                 raise Exception(f"Required folder '{folder}' not found!")
     return folders_dict
 

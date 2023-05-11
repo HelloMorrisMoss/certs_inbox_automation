@@ -1,7 +1,7 @@
 from typing import List
 
 from helpers.paths import double_slash_paths
-from untracked_config.development_node import DEV_TEST_MODE, ON_DEV_NODE
+from untracked_config.development_node import ON_DEV_NODE, UNIT_TESTING
 
 if ON_DEV_NODE:
     development_inbox_folders: List[str] = [r'\\account\Specific Inbox\Automation Testing\active_files\Inbox']
@@ -15,7 +15,7 @@ if ON_DEV_NODE:
         "target_folder_path": r'\\account\Inbox\Foam Duplicate Lots',
         "local_save_folder_path": "dev/local/files",
         }
-    if DEV_TEST_MODE:
+    if UNIT_TESTING:
         acct_path_dct.update({
             'known_good_final_state_inbox_folder': r'\\account\unit_test_files\known_good_final_state_inbox_folder',
             'known_good_final_state_move_to_folder': r'\\account\unit_test_files\known_good_state Moved Items',

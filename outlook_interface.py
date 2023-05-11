@@ -1,6 +1,8 @@
 """A win32com interface for dealing with Outlook"""
 
+import subprocess
 import time
+import winreg
 
 import pythoncom
 import win32com.client
@@ -15,6 +17,7 @@ class OutlookSingleton:
 
     def __new__(cls) -> 'OutlookSingleton':
         if cls._instance is None:
+            lg.debug('Initializing Outlook instance.')
             cls._instance = super().__new__(cls)
             cls._instance._outlook = None
         return cls._instance
@@ -33,15 +36,23 @@ class OutlookSingleton:
             self._outlook = win32com.client.Dispatch("Outlook.Application")
         try:
             self._outlook.Session
-        except Exception as e:
-            if isinstance(e, win32com.client.pywintypes.com_error) and e.hresult == -2147023174:
+        except win32com.client.pywintypes.com_error as py_win_err:
+            if py_win_err.hresult == -2147023174:
                 # Outlook session has expired, reopen Outlook
                 lg.warning("Outlook session expired, reopening")
                 self._reset_coinitialize()
                 self._outlook = win32com.client.Dispatch("Outlook.Application")
+            elif py_win_err.hresult == -2147220995:
+                lg.debug('Not connected to the server, may still be loading.')
+                time.sleep(15)
+                try:
+                    self._outlook.Session  # try one more time
+                except Exception:
+                    lg.info('Could not connect to Outlook server, restarting Outlook application.')
+                    self.reset_outlook()
             else:
                 # Other errors, log and raise the exception
-                lg.exception("Error accessing Outlook")
+                lg.exception("Error accessing Outlook", exc_info=py_win_err)
                 raise
         return self._outlook
 
@@ -99,8 +110,9 @@ class OutlookSingleton:
         """
         # Close the existing Outlook process
         lg.info('Terminating existing Outlook Application.')
+        self._outlook.Quit()
         pythoncom.CoUninitialize()
-        self._outlook.Application.Quit()
+        self._outlook = None
 
         # Wait for 5 seconds before starting a new process
         time.sleep(5)
@@ -113,12 +125,35 @@ class OutlookSingleton:
         Returns:
             The Dispatch object representing the new instance of the Outlook application.
         """
+        lg.info('Restarting Outlook Application, this will take at least 15 seconds.')
         self.terminate_outlook()
+        start_Outlook()
+        time.sleep(10)
+
         try:
             return self.get_outlook()
         except Exception as e:
             lg.error(f"Error resetting Outlook application: {e}")
             raise e
+
+
+
+
+
+def get_outlook_installation_path():
+    try:
+        reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
+            value, _ = winreg.QueryValueEx(key, None)
+            return value
+    except FileNotFoundError:
+        return None
+
+
+def start_Outlook(application_path=None):
+    application_path = get_outlook_installation_path() if not application_path else application_path
+
+    subprocess.Popen(application_path)
 
 
 wc_outlook = OutlookSingleton()

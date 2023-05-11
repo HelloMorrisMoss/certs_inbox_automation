@@ -26,27 +26,28 @@ def test_sync(config_module, template_module):
             continue
 
         # Check that variable exists in template module
-        assert hasattr(template_module, var_name), f"Variable {var_name} is missing in template module"
+        tmf = template_module.__file__
+        assert hasattr(template_module, var_name), f"Variable {var_name} is missing in template module: {tmf}"
 
         var_config = getattr(config_module, var_name)
         var_template = getattr(template_module, var_name)
 
         # Check that types match
-        assert type(var_config) == type(var_template), f"Type of {var_name} is different in config and template module"
+        assert type(var_config) == type(var_template), f"Type of {var_name} mismatch: {tmf}"
 
         # Check if variable is a dictionary
         if isinstance(var_config, dict):
-            test_dict_sync(var_config, var_template, var_name)
+            test_dict_sync(var_config, var_template, var_name, tmf)
 
 
-def test_dict_sync(var_config, var_template, var_name=''):
+def test_dict_sync(var_config, var_template, var_name='', template_file: str=''):
     assert isinstance(var_template, dict), f"Type of {var_name} is different in config and template module"
     assert var_config.keys() == var_template.keys(), f"Keys of dictionary {var_name} don't match in config" \
-                                                     f" and template module"
+                                                     f" and template module {template_file}"
     for key in var_config.keys():
         assert type(var_config[key]) == type(var_template[
                                                  key]), f"Type of value for key {key} in dictionary {var_name} is" \
-                                                        f" different in config and template module"
+                                                        f" different in config and template module {template_file}"
 
 
 class TestSynchronization(unittest.TestCase):
@@ -73,7 +74,7 @@ class TestSynchronization(unittest.TestCase):
         test_sync(sbjre, sbjre_t)
 
     def test_email_json(self):
-        prefix = '../'
+        prefix = './'
         settings_json_filepath = f'{prefix}untracked_config/email_settings.json'
         settings_json_template_filepath = f'{prefix}untracked_config/email_settings_template.json'
         with open(settings_json_filepath, 'r') as settings_json_file, open(settings_json_template_filepath, 'r') as settings_json_template_file:
