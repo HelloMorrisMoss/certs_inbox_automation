@@ -13,6 +13,7 @@ from helpers.outlook_helpers import add_categories_to_mail, colorize_outlook_ema
     remove_categories_from_mail
 from log_setup import lg
 from untracked_config.auto_dedupe_cust_ids import dedupe_columns
+from untracked_config.development_node import ON_DEV_NODE, UNIT_TESTING
 from untracked_config.subject_regex import subject_pattern
 
 
@@ -151,8 +152,8 @@ def get_mail_items_from_results(list_of_series, o_item_col='o_item') -> list:
     """Extract the w32com.CDispatch.client Outlook mail item from the list of Pandas' series."""
     mail_items = []
     for p_row in list_of_series:
-        if len(p_row) > 1:
-            lg.warning(f'mirs row list had more than a single item.')
+        # if len(p_row) > 1:
+        #     lg.warning(f'mirs row list had more than a single item.')
         for rlist in p_row:
             mail_items.append(rlist[1][o_item_col])
     return mail_items
@@ -233,7 +234,7 @@ def process_foam_groups(df: pd.DataFrame, current_folder_path: str,
     items_to_move: list = get_mail_items_from_results(item_rows_to_move)
 
     # for development, color code the groups and items to move
-    if smry:
+    if ON_DEV_NODE and not UNIT_TESTING:  # unit testing will put a copy in the unit test directory
         color_foam_groups(dfg, items_to_move, move_item_color=smry['testing_colors_move'],
                           valid_colors=smry['valid_colors'])
     # move the duplicates

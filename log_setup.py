@@ -5,8 +5,10 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from untracked_config.development_node import ON_DEV_NODE
+from untracked_config.development_node import ON_DEV_NODE, RUNNING_IN_DEBUG, UNIT_TESTING
 
+MODE_PREFIX = 'TEST' * UNIT_TESTING + 'DEBUG' * RUNNING_IN_DEBUG + '.'
+bread_crumb_str = MODE_PREFIX + "{}.{}.{}"
 
 class BreadcrumbFilter(logging.Filter):
     """Provides %(breadcrumbs) field for the logger formatter.
@@ -23,7 +25,7 @@ class BreadcrumbFilter(logging.Filter):
     """
 
     def filter(self, record):
-        record.breadcrumbs = "{}.{}.{}".format(record.module, record.funcName, record.lineno)
+        record.breadcrumbs = bread_crumb_str.format(record.module, record.funcName, record.lineno)
         return True
 
 
@@ -67,6 +69,6 @@ def setup_logger(log_file_path: str = './logs/program.log'):
     return logr
 
 
-if __name__ != '__main__':
     # protect against multiple loggers from importing in multiple files
+if __name__ != '__main__':
     lg = setup_logger() if not logging.getLogger().hasHandlers() else logging.getLogger()

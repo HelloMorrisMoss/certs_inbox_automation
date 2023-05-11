@@ -1,9 +1,7 @@
-import os
 import unittest
 
 from main_process import get_process_ol_folders, main_process_function, wc_outlook
 from untracked_config.accounts_and_folder_paths import acct_path_dct
-from untracked_config.development_node import DEV_TEST_MODE
 
 
 def test_email_properties(control_folder, test_folder):
@@ -55,7 +53,6 @@ def test_email_properties(control_folder, test_folder):
 
 
 def test_final_state_folders():
-    print(f"{os.environ.get('UNITTEST')=}")
     found_folders_dict, production_inbox_folders = get_process_ol_folders(wc_outlook)
 
     # test folders
@@ -94,8 +91,6 @@ def test_final_state_folders():
 
 class TestFolderFinalStates(unittest.TestCase):
     def test_final_states(self):
-        print(f"{DEV_TEST_MODE=}")
-        print(f"{os.environ.get('UNITTEST')=}")
         test_final_state_folders()
 
 

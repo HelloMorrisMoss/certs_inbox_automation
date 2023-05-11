@@ -1,5 +1,4 @@
 """Contains a boolean 'constant' that is true on the development system and false otherwise."""
-import os
 import platform
 import sys
 from typing import Final, List
@@ -14,4 +13,6 @@ node = platform.node()
 ON_DEV_NODE: Final[bool] = node in __dev_node_names
 
 # whether the program is running as a unit test or in debug mode; Outlook folder paths are switched to testing folders
-DEV_TEST_MODE: Final[bool] = os.environ.get('UNITTEST') or (sys.gettrace() is not None)
+UNIT_TESTING = any(['unittest' in arg for arg in sys.argv])
+RUNNING_IN_DEBUG = (sys.gettrace() is not None)
+DEV_TEST_MODE: Final[bool] = UNIT_TESTING or RUNNING_IN_DEBUG
