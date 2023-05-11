@@ -73,7 +73,7 @@ class TestSynchronization(unittest.TestCase):
         test_sync(sbjre, sbjre_t)
 
     def test_email_json(self):
-        prefix = '../../'
+        prefix = '../'
         settings_json_filepath = f'{prefix}untracked_config/email_settings.json'
         settings_json_template_filepath = f'{prefix}untracked_config/email_settings_template.json'
         with open(settings_json_filepath, 'r') as settings_json_file, open(settings_json_template_filepath, 'r') as settings_json_template_file:

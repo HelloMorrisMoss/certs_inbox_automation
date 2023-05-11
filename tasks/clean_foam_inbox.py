@@ -2,7 +2,6 @@
 
 import datetime
 import re
-from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -67,12 +66,11 @@ def sort_mail_items_to_dataframes(items: List[Dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(items).sort_values('received_time', axis=0, ascending=True).reset_index(drop=True)
 
 
-def get_process_folders_dfs(acct_name: str, proc_folders: List[str], folders_dict: dict = None,
+def get_process_folders_dfs(proc_folders: List[str], folders_dict: dict = None,
                             summary_dict: dict = None) -> List[Tuple[pd.DataFrame, str]]:
     """Process mail items in a list of folders and returns a list of tuples, each containing a DataFrame with the mail
     items and the path of the folder it came from.
 
-    :param acct_name: str, the name of the account that contains the folders being processed.
     :param proc_folders: List[str], the list of folder paths to process.
     :param folders_dict: dict, a dictionary containing the folders to process, indexed by their path.
     :param summary_dict: dict, a dictionary to store summary information about the mail items processed.
@@ -155,7 +153,6 @@ def get_mail_items_from_results(list_of_series, o_item_col='o_item') -> list:
     for p_row in list_of_series:
         if len(p_row) > 1:
             lg.warning(f'mirs row list had more than a single item.')
-            pprint(p_row)
         for rlist in p_row:
             mail_items.append(rlist[1][o_item_col])
     return mail_items
@@ -202,11 +199,8 @@ def compare_keep_and_move(mirs, kirs):
 def color_foam_groups(dfg, move_items, move_item_color, valid_colors):
     colorize_outlook_email_list(move_items, move_item_color)
     for color, (group_name, group_df) in zip(valid_colors, dfg):
-        print(f'{color=}, {len(group_df)}')
         for _, row in group_df.iterrows():
             o_item = row['o_item']
-
-            print(f'{o_item.Subject=}, {o_item.Categories=}')
             add_categories_to_mail(o_item, color)
 
 
