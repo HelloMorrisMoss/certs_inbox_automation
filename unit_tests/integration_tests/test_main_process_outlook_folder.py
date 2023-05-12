@@ -1,10 +1,12 @@
 import unittest
 
+from win32com.client import Dispatch
+
 from main_process import get_process_ol_folders, main_process_function, wc_outlook
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 
 
-def test_email_properties(control_folder, test_folder):
+def test_email_properties(control_folder: Dispatch, test_folder: Dispatch):
     """Tests that emails in the control and test folders have identical properties."""
     control_emails = control_folder.Items
     test_emails = test_folder.Items
@@ -37,7 +39,8 @@ def test_email_properties(control_folder, test_folder):
                 matching_test_props = test_props
                 break
 
-        assert matching_test_props is not None, f"Email not matched in test folder: {control_props}"
+        tf_path = test_folder.FolderPath
+        assert matching_test_props is not None, f"Email not matched in test folder: {tf_path} - {control_props}"
 
         # Compare properties of matching emails  - TODO: is this part redundant?
         for property_key in control_props.keys():
@@ -79,6 +82,7 @@ def test_final_state_folders():
             for item in t_folder.Items:
                 item.Delete()
 
+    pass
     for item in test_file_origin.Items:
         new_copy = item.Copy()
         new_copy.Move(inbox_folder)
