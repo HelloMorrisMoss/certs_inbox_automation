@@ -1,8 +1,26 @@
-"""A win32com interface for dealing with Outlook"""
+"""A win32com interface for dealing with Outlook.
+
+This module provides a win32com interface for interacting with Microsoft Outlook. It includes functionality for handling
+the Outlook application, accessing the MAPI namespace, resetting the Outlook instance, terminating the Outlook process,
+and starting Outlook.
+
+Classes:
+    OutlookSingleton: Provides a single instance of the Outlook application and handles Outlook being unavailable for
+        several issues.
+
+Functions:
+    get_outlook_installation_path: Retrieve the installation path of Microsoft Outlook from the registry.
+    start_outlook: Start Microsoft Outlook using the specified application path.
+
+Variables:
+    wc_outlook: An instance of the `OutlookSingleton` class representing the single instance of the Outlook application.
+
+"""
 
 import subprocess
 import time
 import winreg
+from typing import Union
 
 import pythoncom
 import win32com.client
@@ -127,7 +145,7 @@ class OutlookSingleton:
         """
         lg.info('Restarting Outlook Application, this will take at least 15 seconds.')
         self.terminate_outlook()
-        start_Outlook()
+        start_outlook()
         time.sleep(10)
 
         try:
@@ -137,10 +155,12 @@ class OutlookSingleton:
             raise e
 
 
+def get_outlook_installation_path() -> Union[str, None]:
+    """Retrieve the installation path of Microsoft Outlook from the registry.
 
-
-
-def get_outlook_installation_path():
+    Returns:
+        Union[str, None]: The installation path of Microsoft Outlook or None if it is not found.
+    """
     try:
         reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE"
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
@@ -150,10 +170,18 @@ def get_outlook_installation_path():
         return None
 
 
-def start_Outlook(application_path=None):
-    application_path = get_outlook_installation_path() if not application_path else application_path
+def start_outlook(application_path: Union[str, None] = None) -> None:
+    """Start Microsoft Outlook using the specified application path.
 
+    Args:
+        application_path (Union[str, None], optional): The path of the Outlook application executable. If None, the default installation path will be used. Defaults to None.
+
+    Returns:
+        None
+    """
+    application_path = get_outlook_installation_path() if application_path is None else application_path
     subprocess.Popen(application_path)
+
 
 
 wc_outlook = OutlookSingleton()

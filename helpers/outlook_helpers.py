@@ -6,6 +6,7 @@ from win32com import client as wclient
 
 from outlook_interface import wc_outlook
 
+# a dictionary relating string names of colors to their Outlook color category proper strings
 color_map: Final[dict] = {'red': 'Red Category',
              'orange': 'Orange Category',
              'yellow': 'Yellow Category',
@@ -16,10 +17,10 @@ color_map: Final[dict] = {'red': 'Red Category',
              'pink': 'Pink Category',
              'grey': 'Grey Category',
              }
-valid_colors = color_map.keys()
-valid_categories = color_map.values()
+valid_colors = color_map.keys()  # colors that can be selected
+valid_categories = color_map.values()  # valid category strings
 
-default_follow_up_text = 'Follow up'
+default_follow_up_text = 'Follow up'  # default text mail's FollowupRequest property will be set to
 
 
 def add_categories_to_mail(mail: wclient.CDispatch, categories: Union[str, List[str]]) -> None:
