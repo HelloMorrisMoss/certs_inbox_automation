@@ -122,6 +122,7 @@ def group_foam_mail(df: pd.DataFrame, folder_path: str, summary_dict: dict = Non
 
     name: tuple; grp: pd.DataFrame  # type hinting for the loop
     for name, grp in dfg:
+        grp.sort_values(axis=0, by='cert_number', ascending=True, inplace=True)
         keep_item_rows.append([item_row for item_row in grp.iloc[:1].iterrows()])  # the first row (mail)
         move_item_rows.append([item_row for item_row in grp.iloc[1:].iterrows()])  # the rest of the rows
 
