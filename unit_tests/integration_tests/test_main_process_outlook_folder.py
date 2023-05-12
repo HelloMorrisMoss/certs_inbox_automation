@@ -57,8 +57,9 @@ def test_final_state_folders():
 
     # test folders
     test_inbox_path = acct_path_dct["inbox_folders"][0]
-    tst_path = r'Automation Testing\unit_test_files'
-    assert tst_path in test_inbox_path.lower()  # to help protect against accidentally running against production folder
+    tst_path = r'automation testing\unit_test_files'
+    # to help protect against accidentally running against production folder
+    assert tst_path in test_inbox_path.lower(), f'''Inbox doesn't match test folder pattern: {test_inbox_path}'''
 
     inbox_folder = found_folders_dict[test_inbox_path]
     target_folder = found_folders_dict[acct_path_dct['target_folder_path']]
