@@ -1,3 +1,4 @@
+import datetime
 import subprocess
 import threading
 import time
@@ -5,8 +6,11 @@ import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from pytz import timezone
 
+from log_setup import lg
 from untracked_config.scheduling_data import MAIN_PROCESS_DIR_PATH, MAIN_PROCESS_FILENAME, PYTHON_EXE_PATH, \
     SCHEDULING_PARAMETERS
+
+lg.info('Scheduler start at %s', datetime.datetime.now())
 
 
 # define the job function to run main_process.py in a new process
