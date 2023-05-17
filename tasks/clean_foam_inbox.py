@@ -17,12 +17,14 @@ from untracked_config.development_node import ON_DEV_NODE, UNIT_TESTING
 from untracked_config.subject_regex import subject_pattern
 
 
-def process_mail_items(mail_items: list, summary_dict=None) -> List[Dict]:
+def process_mail_items(mail_items: list, summary_dict=None) -> tuple[
+    list[dict[str, Any]], list[dict[str, datetime.datetime | str | Any]]]:
     """Processes the given mail items, extracting relevant information and returning a list of dictionaries.
 
     :param mail_items: A list of win32com CDispatch objects representing the mail items.
     :param summary_dict: dict, a dictionary for storing development/debugging information from the process.
-    :return: List[dict], A list of dictionaries representing the mail items, with keys for 'received_time', 'subject', and other
+    :return: List[dict], A list of dictionaries representing the mail items, with keys for 'received_time',
+    'subject', and other
         extracted information.
     """
     # lists to populate
@@ -36,26 +38,29 @@ def process_mail_items(mail_items: list, summary_dict=None) -> List[Dict]:
         subject: str = item.Subject
         all_subj.append(subject)
         match: re.Match = subject_pattern.match(subject)
+
+        # pandas needs datetime.datetime not pywintypes.datetime; it's in UTC, thus the adjustment
+        # todo: DST-proof this
+        received_time = datetime.datetime.fromtimestamp(item.ReceivedTime.timestamp() + 14400)  # it's in UTC
+        if received_time is None:
+            lg.debug(f'No received time on {subject}')
+            continue
+        initial_row = {"received_time": received_time, "subject": subject, 'o_item': item}
+
         if match:
             matched_sub.append(subject)
             subj_dict = match.groupdict()
 
-            # pandas needs datetime.datetime not pywintypes.datetime; it's in UTC, thus the adjustment
-            # todo: DST-proof this
-            received_time = datetime.datetime.fromtimestamp(item.ReceivedTime.timestamp() + 14400)  # it's in UTC
-            if received_time is None:
-                lg.debug(f'No received time on {subject}')
-                continue
-            row = {"received_time": received_time, "subject": subject, 'o_item': item} | subj_dict
+            row = initial_row | subj_dict
             results.append(row)
         else:
-            non_regex_matching_emails.append((subject, item))
+            non_regex_matching_emails.append(initial_row)
 
     if summary_dict is not None:  # recording for development
         summary_dict['all_subj_lines'] += all_subj
         summary_dict['matched'] += matched_sub
         summary_dict['non_regex_matching_emails']: List[Tuple[str, wclient.CDispatch]] = non_regex_matching_emails
-    return results
+    return results, non_regex_matching_emails
 
 
 def sort_mail_items_to_dataframes(items: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -87,13 +92,14 @@ def get_process_folders_dfs(proc_folders: List[str], folders_dict: dict = None,
             continue
         lg.debug(f'Processing folder: {folder_path}')
         items: List[wclient.CDispatch] = olFolder.Items
-        results: List[dict] = process_mail_items(items)
+        results, other_emails = process_mail_items(items)
         if results:
             df = sort_mail_items_to_dataframes(results)
+            other_emails_df = sort_mail_items_to_dataframes(other_emails)
 
             if not df.empty:
                 df['lot8'] = df['lot_number'].str[:8]
-                pf_dfs.append((df, folder_path))
+                pf_dfs.append((folder_path, df, other_emails_df))
             else:
                 lg.debug(f'No results in {folder_path}')
             if summary_dict is not None:

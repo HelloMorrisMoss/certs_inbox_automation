@@ -57,10 +57,15 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     move_folder_com = found_folders_dict[acct_path_dct['target_folder_path']]
 
     # process mail items
-    for df, this_folder_path in pfdfs:
+    for this_folder_path, df, other_emails_df in pfdfs:
         lg.info('Processing %s', this_folder_path)
         if this_folder_path in found_folders_keys:
             lg.info('Setting follow up flags on priority customer items.')
+            pass
+            folder_path = acct_path_dct['local_save_folder_path']
+            nbe_cert_emails = get_nbe_emails(other_emails_df)
+            process_nbe_test_reports(folder_path, nbe_cert_emails)
+
             set_priority_customer_category(df, priority_flag_dict, True)
             process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
                                 move_folder_com, smry)
@@ -74,6 +79,41 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     return found_folders_dict, smry
 
 
+def get_nbe_emails(other_emails_df):
+    nbe_re_ptn = re.complile('Certificate for Delivery:\d{16}')
+    nbe_mask = other_emails_df['subject'].str.contains(nbe_re_ptn)
+    nbe_cert_emails = other_emails_df[nbe_mask].copy()
+    return nbe_cert_emails
+
+
+def process_nbe_test_reports(folder_path, nbe_cert_emails):
+    for rn, row in nbe_cert_emails.iterrows():
+        email = row['o_item']
+        # Loop through each attachment in the email
+        for attachment in email.Attachments:
+            print(attachment)
+            # Check if the attachment is a PDF file
+            if attachment.FileName.lower().endswith(".pdf"):
+                # Save the attachment to the folder
+                try:
+                    save_loc = os.path.join(folder_path, attachment.FileName)
+                    print(f'Saving to {save_loc}')
+                    attachment.SaveAsFile(save_loc)
+                    rdr = pypdf.PdfReader(save_loc)
+                    nbe_data = extract_nbe_report_data(rdr)
+                    lot_data = nbe_data['lot_info']
+                    new_subj = f'''{lot_data['product_name']} {lot_data['tabcode_lw']} 
+                    {lot_data['delivery_number_nbe']} lots:{' '.join(nbe_data['test_results'].keys())}'''
+                    email.Subject = new_subj
+                    email.Body = pformat(nbe_data)
+                    email.Save()
+                    print(f'{email.Subject=} {email.Body=}')
+                except Exception as e:
+                    lg.error(
+                        f"ERROR saving attachment from email with subject '{email.Subject}': {e}"
+                        )
+
+
 def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any], List[str]]:
     """Retrieve Outlook folders for processing.
 
@@ -85,7 +125,8 @@ def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any]
         wc_outlook (OutlookSingleton): An instance of the `OutlookSingleton` class representing the Outlook application.
 
     Returns:
-        Tuple[Dict[str, Any], List[str]]: A tuple containing a dictionary of found folders and a list of production inbox folders.
+        Tuple[Dict[str, Any], List[str]]: A tuple containing a dictionary of found folders and a list of production
+        inbox folders.
     """
     account_name = acct_path_dct['account_name']
     inbox_folders = acct_path_dct['inbox_folders']
