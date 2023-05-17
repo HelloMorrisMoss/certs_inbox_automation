@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
@@ -134,19 +134,20 @@ def get_test_results_dict_from_page(coords_df: pd.DataFrame) -> Dict[str, Dict[s
     return test_results_dict
 
 
-def get_lot_info_dict(lot_info_page: pypdf.pdf.PageObject) -> Dict[str, str]:
+def get_lot_info_dict(lot_info_page: pypdf.PageObject) -> Dict[str, str]:
     """Get a dictionary of lot information from the lot page of an NBE test report.
 
     :param lot_info_page: The lot_info_page object.
     :return: dict, A dictionary containing the extracted lot information.
     """
+    # todo: move these config bits to untracked_config
     lot_keys: List[str] = ['Purchase Order / date:', 'Delivery / date:', 'Order / date: ', 'Customer number:',
                            'Material our / your reference:', 'Commercial Name:', 'Judgement :']
     lot_text_dict: Dict[str, str] = get_left_header_dict_from_page(lot_info_page, lot_keys)
 
     # use this to split combo lines into multiple dictionary entries; avoids a bunch of case-by-case if/then
     # tuples have a new keys tuple and then the old key: (('new', 'keys'), 'old key')
-    split_guide: Tuple[Tuple[Tuple[str, ...], ...], str] = (
+    split_guide = (
         (('po_number_nbe', 'po_date_nbe'), 'Purchase Order / date:'),
         (('order_number_nbe', 'order_date_nbe'), 'Order / date: '),
         (('product_number_nbe', 'tabcode_lw'), 'Material our / your reference:'),
@@ -250,7 +251,7 @@ if __name__ == '__main__':
         report_data = extract_nbe_report_data(reader)
         pp(report_data)
         print()
-        break
+        break  # only one for a quick test
 
     pprint(program_performance_results_dict)
 
