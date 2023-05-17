@@ -244,7 +244,7 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', 100)
     pd.set_option('display.width', 1000)
 
-    for cfd in scandir('../untracked_sample_files/NBE_test_reports'):
+    for cfd in scandir('../../untracked_sample_files/NBE_test_reports'):
         print(f'Processing: {cfd.name}')
         reader = pypdf.PdfReader(path.abspath(cfd.path))
         report_data = extract_nbe_report_data(reader)
