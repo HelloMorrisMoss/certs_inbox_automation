@@ -116,9 +116,7 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
                     # todo: save the data to a database for future use
                 except Exception as e:
-                    lg.error(
-                        f"ERROR saving attachment from email with subject '{email.Subject}': {e}"
-                        )
+                    lg.error(f"ERROR saving attachment from email with subject '{email.Subject}': {e}")
 
 
 def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any], List[str]]:
