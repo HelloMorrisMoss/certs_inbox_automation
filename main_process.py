@@ -107,8 +107,8 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     rdr = pypdf.PdfReader(save_loc)
                     nbe_data = extract_nbe_report_data(rdr)
                     lot_data = nbe_data['lot_info']
-                    new_subj = f'''{lot_data['product_name']} {lot_data['tabcode_lw']} 
-                    {lot_data['delivery_number_nbe']} lots:{' '.join(nbe_data['test_results'].keys())}'''
+                    new_subj = f"{lot_data['product_name']} {lot_data['tabcode_lw']} " \
+                               f"{lot_data['delivery_number_nbe']} lots:{' '.join(nbe_data['test_results'].keys())}"
                     email.Subject = new_subj
                     email.Body = pformat(nbe_data)
                     email.Save()
