@@ -105,7 +105,23 @@ def get_test_results_dict_from_page(coords_df: pd.DataFrame) -> Dict[str, Dict[s
 
         # filter the results for this dom
         y_mask = coords_df['dom_y'] == dom_y
+        # TODO: replace this 'initial' with find the 'Characteristic' bit, and then grab stuff beneath that
+        #  sort of like the DoM, maybe figure out 'rows', !clustering! by y
+        #  this file has no 'initial' in the result names: Certificate for Delivery0080619033000060.PDF
         result_Mask = coords_df['text'].str.contains('initial')
+        coords_df['apart'] = abs(coords_df['tm_y'].diff()) > 1  # is the next far enough apart to be different rows?
+        coords_df['row_groups'] = coords_df['apart'].cumsum()  # cumulative sum (True=1) gives groups
+
+        prints = 5  # print this many groups
+        for gn, grp in coords_df.groupby('row_groups'):
+            if gn > 5:  # skip the first this many
+                print(grp[['text', 'tm_y', 'row_groups']])
+                prints -= 1
+                if not prints:
+                    break  # reached prints, stop
+        # todo: turn this functionality into a function
+        # todo: use x coords (as before) to match on column headers for rows
+
         test_name_rows_df: pd.DataFrame = coords_df[result_Mask & y_mask]
 
         test_results_dict[dom_n] = {}  # add an entry for this dom

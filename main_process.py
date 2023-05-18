@@ -6,16 +6,20 @@ modifications:
 * move duplicate foam certs out of the main inbox
 """
 import datetime
+import os
 import traceback
+from pprint import pformat
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+import pypdf
 
 from helpers.json_help import df_json_handler
 from helpers.outlook_helpers import find_folders_in_outlook, valid_colors
 from log_setup import lg
 from outlook_interface import OutlookSingleton, wc_outlook
 from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups
+from tasks.filing_test_reports.read_nbe_test_report_data import extract_nbe_report_data
 from tasks.mark_priority_emails import set_priority_customer_category
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
@@ -79,8 +83,9 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     return found_folders_dict, smry
 
 
+import re
 def get_nbe_emails(other_emails_df):
-    nbe_re_ptn = re.complile('Certificate for Delivery:\d{16}')
+    nbe_re_ptn = re.compile('Certificate for Delivery:\d{16}')
     nbe_mask = other_emails_df['subject'].str.contains(nbe_re_ptn)
     nbe_cert_emails = other_emails_df[nbe_mask].copy()
     return nbe_cert_emails
@@ -108,6 +113,8 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     email.Body = pformat(nbe_data)
                     email.Save()
                     print(f'{email.Subject=} {email.Body=}')
+                    # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
+                    # todo: save the data to a database for future use
                 except Exception as e:
                     lg.error(
                         f"ERROR saving attachment from email with subject '{email.Subject}': {e}"
