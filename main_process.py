@@ -8,7 +8,6 @@ modifications:
 import datetime
 import os
 import traceback
-from pprint import pformat
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
@@ -110,7 +109,12 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     new_subj = f"{lot_data['product_name']} {lot_data['tabcode_lw']} " \
                                f"{lot_data['delivery_number_nbe']} lots:{' '.join(nbe_data['test_results'].keys())}"
                     email.Subject = new_subj
-                    email.Body = pformat(nbe_data)
+                    body_text = '''<html><body>{}</body></html>'''
+                    # email.HTMLBody = body_text.format(pformat(lot_data).replace('\n', '<br>') + '<br><br>' + nbe_data['test_results'].to_html())
+                    email.HTMLBody = body_text.format(
+                        pd.DataFrame.from_dict({k: [v] for k, v in lot_data.items()}).T.to_html(
+                            header=False) + '<br><br>' + nbe_data[
+                            'test_results'].to_html(index=False))
                     email.Save()
                     print(f'{email.Subject=} {email.Body=}')
                     # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
