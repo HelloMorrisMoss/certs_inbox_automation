@@ -92,9 +92,10 @@ def get_nbe_emails(other_emails_df):
 
 def process_nbe_test_reports(folder_path, nbe_cert_emails):
     for rn, row in nbe_cert_emails.iterrows():
-        email = row['o_item']
-        # Loop through each attachment in the email
-        for attachment in email.Attachments:
+        original_email = row['o_item']
+        # if there's only one attachment (there should be)
+        if original_email.Attachments.Count == 1:
+            attachment = original_email.Attachments.Item(1)
             print(attachment)
             # Check if the attachment is a PDF file
             if attachment.FileName.lower().endswith(".pdf"):
@@ -103,20 +104,40 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     save_loc = os.path.join(folder_path, attachment.FileName)
                     print(f'Saving to {save_loc}')
                     attachment.SaveAsFile(save_loc)
+
+                    # get the data from the PDF
                     rdr = pypdf.PdfReader(save_loc)
                     nbe_data = extract_nbe_report_data(rdr)
                     lot_data = nbe_data['lot_info']
+                    results_df = nbe_data['test_results']['results_df']
+
+                    # create a new subject with useful info
+                    mfr_dates = results_df['date_of_manufacture']
                     new_subj = f"{lot_data['product_name']} {lot_data['tabcode_lw']} " \
-                               f"{lot_data['delivery_number_nbe']} lots:{' '.join(nbe_data['test_results'].keys())}"
+                               f"DN: {lot_data['delivery_number_nbe']} lots: {' '.join(mfr_dates)}"
+
+                    # set the html body
+                    body_text_template = '''<html><body>{}</body></html>'''
+                    # add a lot header and html table for each lot
+                    mf_grps = results_df.groupby('date_of_manufacture')
+                    results_df_html = '<br><br>'.join([f"Lot: {md}<br>{df.to_html(index=False)}" for md, df in mf_grps])
+
+                    # create a new email to populate with the desired subject/body
+                    email = original_email.Parent.Items.Add()
                     email.Subject = new_subj
-                    body_text = '''<html><body>{}</body></html>'''
-                    # email.HTMLBody = body_text.format(pformat(lot_data).replace('\n', '<br>') + '<br><br>' + nbe_data['test_results'].to_html())
-                    email.HTMLBody = body_text.format(
+                    email.HTMLBody = body_text_template.format(
                         pd.DataFrame.from_dict({k: [v] for k, v in lot_data.items()}).T.to_html(
-                            header=False) + '<br><br>' + nbe_data[
-                            'test_results'].to_html(index=False))
+                            header=False) + '<br><br>' + results_df_html)
+
+                    # attach the PDF and the original email as attachments
+                    email.Attachments.Add(save_loc)
+                    email.Attachments.Add(original_email)
+
+                    # finalize the email and move it to the folder
                     email.Save()
-                    print(f'{email.Subject=} {email.Body=}')
+                    email.Move(original_email.Parent)
+                    print(f'{email.Subject=} {email.HTMLBody=}')
+
                     # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
                     # todo: save the data to a database for future use
                 except Exception as e:

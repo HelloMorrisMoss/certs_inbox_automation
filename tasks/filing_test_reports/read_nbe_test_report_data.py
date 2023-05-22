@@ -120,14 +120,6 @@ def get_test_results_dict_from_page(coords_df: pd.DataFrame) -> Dict[str, Dict[s
     diff_df = diff_df.drop(['font_dict', 'encoding', 'subtype', 'type'], axis=1)  # these are just noise atm
     diff_df = diff_df.sort_values('tm_y', ascending=False)
 
-    # todo: option: put the results into a new dataframe instead
-    #  columns: DoM, test_name, unit, value, lower_limit, upper_limit
-    #  grab everything from the first DoM row down
-    #  then a column for the DoM for each row
-    #  then a column
-
-    # todo: would this make more sense before adding the row/test group columns above?
-    # todo: would it be easier to just loop over groupby('dom_y')?
     # add a DoM column
     diff_df.loc[:, 'date_of_manufacture'] = ''
     for d_gn, dom_grp in diff_df.groupby('dom_y'):
@@ -158,124 +150,18 @@ def get_test_results_dict_from_page(coords_df: pd.DataFrame) -> Dict[str, Dict[s
     for (mfr_date, g_index), group in diff_df[mfr_mask & text_mask & results_mask].groupby(group_columns):
         g_dict = {}  # {hdr: None for hdr in new_col_headers}
         for header, new_header in zip(results_column_top_headers, new_col_headers):
+            g_dict['date_of_manufacture'] = [mfr_date]
             not_hdr = ~(group['text'].str.contains(header))
             hdr_col_true = group[new_header]
             try:
                 result_rows = group.loc[hdr_col_true & not_hdr]
                 g_dict[new_header] = [result_rows['text'].iloc[0]]
-                if len(results_df) != len(results_df['characteristic_col'].unique()):
-                    raise RuntimeError(results_df)
             except IndexError as ierr:
                 print(f'No results for {mfr_date=}:{g_index=}:{header=} - {ierr}')
+                g_dict[new_header] = [None]
         results_df = pd.concat([results_df, pd.DataFrame.from_dict(g_dict)])
     results_df = results_df.fillna('')
     return results_df
-
-    # results_headers_left_header = 'Characteristic'
-    #
-    # # add columns by column header x values
-    # diff_df = diff_df.sort_values('tm_x')
-    # for header in [results_headers_left_header] + results_column_top_headers:
-    #     new_header = f"{header.lower().replace(' ', '_')}_group"
-    #     # diff_df[new_header] = add_below_row_column(dom_df, 'text', header, 'tm_x', new_header)[new_header] != -1
-    #     # if not in_place:
-    #     #     df = df.copy().reset_index(drop=True)
-    #     df=diff_df
-    #     value_col_header = 'tm_x'
-    #     new_col_header = new_header
-    #     search_col_header = 'text'
-    #     row_contains = header
-    #
-    #     df = df.sort_values(value_col_header)
-    #     df.loc[:, new_col_header] = np.nan  # initialize 'empty'
-    #     contains_mask = df[search_col_header].str.contains(row_contains, regex=False)
-    #     # only the rows with the row_contains text in the search_col_header column string
-    #     contains_df = df.loc[contains_mask, :]
-    #
-    #     for row_value in contains_df.loc[:, value_col_header]:
-    #         chr_row_rows = get_tolerance_rows(df, value_col_header, row_value)
-    #
-    #         df.loc[chr_row_rows.index, new_col_header] = row_value
-    #
-    #     df.loc[:, new_col_header] = df.loc[:, new_col_header].fillna(method='ffill')  # fill the rest from above
-    #     df.loc[:, new_col_header] = df.loc[:, new_col_header].fillna(-1)  # except for the header stuff
-    #     df.loc[:, new_col_header] = (df.loc[:, new_col_header].diff() > 1).cumsum()
-    #     # return df
-    # diff_df = diff_df.sort_values('tm_y')
-    #
-    # for dom_gn, dom_grp in diff_df.groupby('dom_y'):
-    #     dom_value: str = dom_grp[dom_grp['text'].str_contains(dom_left_header)].loc[0, 'text']
-    #     test_results_dict[dom_value] = {}
-    #     for tst_gn, tst_grp in dom_grp.groupby('test_group'):
-    #         result_header_rows = get_row_by_left_header(coords_df, results_headers_left_header)
-    #         result_header_coords_df = result_header_rows[['text', 'tm_y', 'tm_x']]
-    #
-    #
-    #
-    #
-    #
-    #
-    # results_headers_left_header = 'Characteristic'
-    # result_header_rows = get_row_by_left_header(coords_df, results_headers_left_header)
-    # result_header_coords_df = result_header_rows[['text', 'tm_y', 'tm_x']]
-    # results_column_top_headers = ['Unit', 'Value', 'Lower Limit', 'Upper Limit']
-    #
-    # coords_df['manufacture_dates'] = coords_df[coords_df['text'].str.contains(dom_left_header, regex=False)]['tm_y']
-    #
-    # # loop through the rows that have test names
-    # for index, mfr_date in mfr_dates.iterrows():
-    #     dom_n = mfr_date['text'].replace(dom_left_header, '').strip()  # the date of manufacture/lot number
-    #     dom_y = mfr_date['tm_y']  # the y coordinate
-    #
-    #     # filter the results for this dom
-    #     y_mask = coords_df[new_col_header] == dom_y
-    #     # TODO: replace this 'initial' with find the 'Characteristic' bit, and then grab stuff beneath that
-    #     #  sort of like the DoM, maybe figure out 'rows', !clustering! by y
-    #     #  this file has no 'initial' in the result names: Certificate for Delivery0080619033000060.PDF
-    #     # result_Mask = coords_df['text'].str.contains('initial')
-    #     coords_df['apart'] = abs(coords_df['tm_y'].diff()).fillna(
-    #         method='bfill') > 1  # is the next far enough apart to be different rows?
-    #     coords_df['row_group'] = coords_df['apart'].cumsum()  # cumulative sum (True=1) gives groups
-    #
-    #     prints = 5  # print this many groups
-    #     for gn, grp in coords_df.groupby('row_groups'):
-    #         if gn > 5:  # skip the first this many
-    #             if any(grp['text'].str.contains('Characteristic')):
-    #                 print(grp[['text', 'tm_y', 'row_groups']])
-    #                 prints -= 1
-    #                 if not prints:
-    #                     break  # reached prints, stop
-    #                 # worthwhile to sort by tm_x?
-    #
-    #     # todo: turn this functionality into a function
-    #     # todo: use x coords (as before) to match on column headers for rows
-    #
-    #     test_name_rows_df: pd.DataFrame = coords_df[result_Mask & y_mask]
-    #
-    #     test_results_dict[dom_n] = {}  # add an entry for this dom
-    #
-    #     for df_index, result_row_left_header_row in test_name_rows_df.iterrows():
-    #         test_header = result_row_left_header_row['text']  # test name
-    #         result_column_header_rows = get_row_by_left_header(coords_df.loc[y_mask],
-    #                                                            test_header)  # row results column headers
-    #         result_header_dict = {k: None for k in results_column_top_headers}
-    #
-    #         # loop through the column headers
-    #         for col_header in results_column_top_headers:
-    #             # get values that match the x coordinate for this header
-    #             _, header_y, header_x = result_header_coords_df[result_header_coords_df['text'] == col_header].values[0]
-    #             result_value_rows = get_tolerance_rows(result_column_header_rows, 'tm_x', header_x, 1)
-    #             value_row_count = len(result_value_rows)  # this hasn't been a problem yet
-    #             if value_row_count == 1:  # only one result (should be this mostly)
-    #                 result_value = result_value_rows.loc[0, 'text']
-    #             elif value_row_count > 0:  # multiple results (shouldn't happen)
-    #                 result_value = [value for value in result_value_rows['text']]
-    #                 print(f'Multiple result rows found: {col_header}: {result_value=}')
-    #             else:  # some don't have one, such as no upper/lower bound on some test ranges
-    #                 result_value = 'None'
-    #             result_header_dict[col_header] = result_value  # add this result to the dict
-    #         test_results_dict[dom_n][test_header] = result_header_dict  # add this result dict to the dict under the dom
-    # return test_results_dict
 
 
 def add_below_row_column(df: pd.DataFrame, search_col_header: str, row_contains: str, value_col_header: str,
@@ -376,7 +262,7 @@ def get_lot_info_dict(lot_info_page: pypdf.PageObject) -> Dict[str, str]:
             program_performance_results_dict['unparsed_count'] += 1
         for (nk, nv) in zip(new_keys, new_values):
             lot_info_dict[nk] = nv.strip()
-
+    # todo: post correction for delivery number: 80619033 / 000060 -> 80619033000060
     return lot_info_dict
 
 
@@ -442,7 +328,11 @@ def extract_nbe_report_data(reader: pypdf.PdfReader) -> Dict[str, dict]:
             pdf_data_dict['lot_info'] = lot_info
         else:  # test results pages
             test_results = get_test_results(page)
-            pdf_data_dict['test_results'] = test_results
+            results_df = pdf_data_dict['test_results'].get('results_df')
+            if results_df is None:
+                pdf_data_dict['test_results']['results_df'] = test_results
+            else:
+                pdf_data_dict['test_results']['results_df'] = pd.concat([results_df, test_results])
             # pdf_data_dict['test_results'].update(test_results)
     return pdf_data_dict
 
