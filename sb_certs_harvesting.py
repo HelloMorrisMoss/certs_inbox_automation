@@ -9,7 +9,7 @@ import os
 import win32com.client as win32
 
 from log_setup import lg
-from untracked_config.accounts_and_folder_paths import production_inbox_folders, acct_path_dct
+from untracked_config.accounts_and_folder_paths import acct_path_dct, production_inbox_folders
 
 
 class PathConverter:
@@ -97,3 +97,38 @@ def export_pdfs_from_inbox():
 
     # Display a message box indicating the export is complete
     win32.MessageBox(None, "PDFs exported from inbox successfully.", "Export Complete", win32.MB_ICONINFORMATION)
+
+######### NBE test reports harvesting
+
+# import os
+#
+# from helpers.outlook_helpers import find_folders_in_outlook
+# from outlook_interface import wc_outlook
+#
+#
+# # ol_folders = wc_outlook.get_outlook_folders()
+#
+# must_find = r'\\SB-certs\1-CERTS Inbox\Incoming PFG Test Reports'
+#
+# found_folders = find_folders_in_outlook(wc_outlook.get_outlook_folders(), 'SB-certs', [must_find])
+#
+# reports_folder = found_folders[must_find]
+#
+# folder_path = os.path.abspath('../untracked_sample_files')
+#
+# for mail in reports_folder.Items:
+#     # Loop through each attachment in the email
+#     for attachment in mail.Attachments:
+#         # Check if the attachment is a PDF file
+#         attachment_name = attachment.FileName
+#         print(f'Attachment found: {attachment_name}')
+#         if True:  #attachment_name.endswith(".pdf"):
+#             # Save the attachment to the folder
+#             try:
+#                 attachment.SaveAsFile(os.path.join(folder_path, attachment_name))
+#                 print(f'Downloaded: {attachment_name}')
+#             except Exception as e:
+#                 print(
+#                     f"ERROR saving attachment from email with subject '{mail.Subject}': {e}"
+#                     )
+

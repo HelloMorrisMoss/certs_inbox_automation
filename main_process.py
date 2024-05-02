@@ -6,16 +6,19 @@ modifications:
 * move duplicate foam certs out of the main inbox
 """
 import datetime
+import os
 import traceback
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+import pypdf
 
 from helpers.json_help import df_json_handler
 from helpers.outlook_helpers import find_folders_in_outlook, valid_colors
 from log_setup import lg
 from outlook_interface import OutlookSingleton, wc_outlook
 from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups
+from tasks.filing_test_reports.read_nbe_test_report_data import extract_nbe_report_data
 from tasks.mark_priority_emails import set_priority_customer_category
 from untracked_config.accounts_and_folder_paths import acct_path_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
@@ -57,10 +60,15 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     move_folder_com = found_folders_dict[acct_path_dct['target_folder_path']]
 
     # process mail items
-    for df, this_folder_path in pfdfs:
+    for this_folder_path, df, other_emails_df in pfdfs:
         lg.info('Processing %s', this_folder_path)
         if this_folder_path in found_folders_keys:
             lg.info('Setting follow up flags on priority customer items.')
+            pass
+            folder_path = acct_path_dct['local_save_folder_path']
+            nbe_cert_emails = get_nbe_emails(other_emails_df)
+            process_nbe_test_reports(folder_path, nbe_cert_emails)
+
             set_priority_customer_category(df, priority_flag_dict, True)
             process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
                                 move_folder_com, smry)
@@ -74,6 +82,68 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     return found_folders_dict, smry
 
 
+import re
+def get_nbe_emails(other_emails_df):
+    nbe_re_ptn = re.compile('Certificate for Delivery:\d{16}')
+    nbe_mask = other_emails_df['subject'].str.contains(nbe_re_ptn)
+    nbe_cert_emails = other_emails_df[nbe_mask].copy()
+    return nbe_cert_emails
+
+
+def process_nbe_test_reports(folder_path, nbe_cert_emails):
+    for rn, row in nbe_cert_emails.iterrows():
+        original_email = row['o_item']
+        # if there's only one attachment (there should be)
+        if original_email.Attachments.Count == 1:
+            attachment = original_email.Attachments.Item(1)
+            print(attachment)
+            # Check if the attachment is a PDF file
+            if attachment.FileName.lower().endswith(".pdf"):
+                # Save the attachment to the folder
+                try:
+                    save_loc = os.path.join(folder_path, attachment.FileName)
+                    print(f'Saving to {save_loc}')
+                    attachment.SaveAsFile(save_loc)
+
+                    # get the data from the PDF
+                    rdr = pypdf.PdfReader(save_loc)
+                    nbe_data = extract_nbe_report_data(rdr)
+                    lot_data = nbe_data['lot_info']
+                    results_df = nbe_data['test_results']['results_df']
+
+                    # create a new subject with useful info
+                    mfr_dates = results_df['date_of_manufacture']
+                    new_subj = f"{lot_data['product_name']} {lot_data['tabcode_lw']} " \
+                               f"DN: {lot_data['delivery_number_nbe']} lots: {' '.join(mfr_dates)}"
+
+                    # set the html body
+                    body_text_template = '''<html><body>{}</body></html>'''
+                    # add a lot header and html table for each lot
+                    mf_grps = results_df.groupby('date_of_manufacture')
+                    results_df_html = '<br><br>'.join([f"Lot: {md}<br>{df.to_html(index=False)}" for md, df in mf_grps])
+
+                    # create a new email to populate with the desired subject/body
+                    email = original_email.Parent.Items.Add()
+                    email.Subject = new_subj
+                    email.HTMLBody = body_text_template.format(
+                        pd.DataFrame.from_dict({k: [v] for k, v in lot_data.items()}).T.to_html(
+                            header=False) + '<br><br>' + results_df_html)
+
+                    # attach the PDF and the original email as attachments
+                    email.Attachments.Add(save_loc)
+                    email.Attachments.Add(original_email)
+
+                    # finalize the email and move it to the folder
+                    email.Save()
+                    email.Move(original_email.Parent)
+                    print(f'{email.Subject=} {email.HTMLBody=}')
+
+                    # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
+                    # todo: save the data to a database for future use
+                except Exception as e:
+                    lg.error(f"ERROR saving attachment from email with subject '{email.Subject}': {e}")
+
+
 def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any], List[str]]:
     """Retrieve Outlook folders for processing.
 
@@ -85,7 +155,8 @@ def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any]
         wc_outlook (OutlookSingleton): An instance of the `OutlookSingleton` class representing the Outlook application.
 
     Returns:
-        Tuple[Dict[str, Any], List[str]]: A tuple containing a dictionary of found folders and a list of production inbox folders.
+        Tuple[Dict[str, Any], List[str]]: A tuple containing a dictionary of found folders and a list of production
+        inbox folders.
     """
     account_name = acct_path_dct['account_name']
     inbox_folders = acct_path_dct['inbox_folders']
