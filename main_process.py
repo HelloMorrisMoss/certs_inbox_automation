@@ -4,9 +4,11 @@ the relevant inboxes/folders, and make the desired modifications to the items th
 modifications:
 * put a follow-up flag on items from prioritized customer shipments
 * move duplicate foam certs out of the main inbox
+* WIP: file intra-company report emails
 """
 import datetime
 import os
+import re
 import traceback
 from typing import Any, Dict, List, Tuple
 
@@ -20,7 +22,7 @@ from outlook_interface import OutlookSingleton, wc_outlook
 from tasks.clean_foam_inbox import get_process_folders_dfs, process_foam_groups
 from tasks.filing_test_reports.read_nbe_test_report_data import extract_nbe_report_data
 from tasks.mark_priority_emails import set_priority_customer_category
-from untracked_config.accounts_and_folder_paths import acct_path_dct
+from untracked_config.accounts_and_folder_paths import acct_path_dct, process_configuration_dct
 from untracked_config.auto_dedupe_cust_ids import dedupe_cnums
 from untracked_config.development_node import ON_DEV_NODE, UNIT_TESTING
 from untracked_config.priority_shipment_customers import priority_flag_dict
@@ -32,7 +34,10 @@ if ON_DEV_NODE:
     pd.set_option('display.width', 1000)
 
 
-def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_folders: List[str]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_folders: List[str],
+                          process_incoming_reports: bool = True, process_priority_customers: bool = True,
+                          process_duplicate_foam_certs: bool = True,
+                          ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Perform the main processing of mail items.
 
     This function performs the main processing of mail items based on the provided `found_folders_dict` and
@@ -67,11 +72,13 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
             pass
             folder_path = acct_path_dct['local_save_folder_path']
             nbe_cert_emails = get_nbe_emails(other_emails_df)
-            process_nbe_test_reports(folder_path, nbe_cert_emails)
-
-            set_priority_customer_category(df, priority_flag_dict, True)
-            process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
-                                move_folder_com, smry)
+            if process_incoming_reports:
+                process_nbe_test_reports(folder_path, nbe_cert_emails)
+            if process_priority_customers:
+                set_priority_customer_category(df, priority_flag_dict, True)
+            if process_duplicate_foam_certs:
+                process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
+                                    move_folder_com, smry)
         else:
             lg.warn(f'Missing {this_folder_path} in checked folders!')
 
@@ -82,7 +89,6 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     return found_folders_dict, smry
 
 
-import re
 def get_nbe_emails(other_emails_df):
     nbe_re_ptn = re.compile('Certificate for Delivery:\d{16}')
     nbe_mask = other_emails_df['subject'].str.contains(nbe_re_ptn)
@@ -96,13 +102,13 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
         # if there's only one attachment (there should be)
         if original_email.Attachments.Count == 1:
             attachment = original_email.Attachments.Item(1)
-            print(attachment)
+            lg.debug(attachment)
             # Check if the attachment is a PDF file
             if attachment.FileName.lower().endswith(".pdf"):
                 # Save the attachment to the folder
                 try:
                     save_loc = os.path.join(folder_path, attachment.FileName)
-                    print(f'Saving to {save_loc}')
+                    lg.debug(f'Saving to {save_loc}')
                     attachment.SaveAsFile(save_loc)
 
                     # get the data from the PDF
@@ -136,7 +142,7 @@ def process_nbe_test_reports(folder_path, nbe_cert_emails):
                     # finalize the email and move it to the folder
                     email.Save()
                     email.Move(original_email.Parent)
-                    print(f'{email.Subject=} {email.HTMLBody=}')
+                    lg.debug(f'{email.Subject=} {email.HTMLBody=}')
 
                     # todo: delete/temp file the PDF downloads; in-memory might be the most efficient
                     # todo: save the data to a database for future use
@@ -178,7 +184,7 @@ if __name__ == '__main__':
     lg.debug(f'Starting at {now}')
     try:
         found_folders_dict, production_inbox_folders = get_process_ol_folders(wc_outlook)
-        main_process_function(found_folders_dict, production_inbox_folders)
+        main_process_function(found_folders_dict, production_inbox_folders, **process_configuration_dct)
 
     # log and alert on unhandled exceptions
     except Exception as err:
@@ -187,6 +193,7 @@ if __name__ == '__main__':
         if not ON_DEV_NODE and not UNIT_TESTING:
             try:
                 from development_files.email_alert import send_alert
+
                 send_alert(subject='Certs_inbox_automation has encountered an unhandled error!', body=stack_trace_str)
             except Exception as em_exc:
                 lg.error(traceback.format_exc())
@@ -194,4 +201,4 @@ if __name__ == '__main__':
         lg.debug('Deleting Outlook com instance.')
         del (wc_outlook)
 
-pass  # for breakpoint
+    pass  # for breakpoint
