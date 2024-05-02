@@ -1,3 +1,4 @@
+from turtle import delay
 from typing import Dict, List, Union, Final
 
 import numpy as np
@@ -262,7 +263,11 @@ def get_lot_info_dict(lot_info_page: pypdf.PageObject) -> Dict[str, str]:
             program_performance_results_dict['unparsed_count'] += 1
         for (nk, nv) in zip(new_keys, new_values):
             lot_info_dict[nk] = nv.strip()
-    # todo: post correction for delivery number: 80619033 / 000060 -> 80619033000060
+
+    # fix the format of the DN that comes out of this part of the report
+    delivery_number = lot_info_dict.get('delivery_number_nbe')
+    if delivery_number is not None:
+        lot_info_dict['delivery_number_nbe'] = delivery_number.replace(' / ', '').zfill(16)
     return lot_info_dict
 
 
