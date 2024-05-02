@@ -2,7 +2,7 @@
 
 import datetime
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import pandas as pd
 import win32com
@@ -17,8 +17,7 @@ from untracked_config.development_node import ON_DEV_NODE, UNIT_TESTING
 from untracked_config.subject_regex import subject_pattern
 
 
-def process_mail_items(mail_items: list, summary_dict=None) -> tuple[
-    list[dict[str, Any]], list[dict[str, datetime.datetime | str | Any]]]:
+def process_mail_items(mail_items: list, summary_dict=None) -> tuple[List[Dict[str, Any]], List[dict[str, Any]]]:
     """Processes the given mail items, extracting relevant information and returning a list of dictionaries.
 
     :param mail_items: A list of win32com CDispatch objects representing the mail items.
@@ -126,7 +125,8 @@ def group_foam_mail(df: pd.DataFrame, folder_path: str, summary_dict: dict = Non
     keep_item_rows: list = []  # rows to keep in the mailbox
     move_item_rows: list = []  # rows to move from the mailbox
 
-    name: tuple; grp: pd.DataFrame  # type hinting for the loop
+    name: tuple;
+    grp: pd.DataFrame  # type hinting for the loop
     for name, grp in dfg:
         grp.sort_values(axis=0, by='cert_number', ascending=True, inplace=True)
         keep_item_rows.append([item_row for item_row in grp.iloc[:1].iterrows()])  # the first row (mail)
