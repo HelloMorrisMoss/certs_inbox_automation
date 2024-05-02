@@ -27,7 +27,7 @@ def process_mail_items(mail_items: list, summary_dict=None) -> tuple[List[dict[s
         extracted information.
     """
     # lists to populate
-    results: List[Dict[str, Any]] = []
+    results: List[dict[str, Any]] = []
     all_subj = []
     matched_sub = []
     non_regex_matching_emails = []
@@ -62,10 +62,10 @@ def process_mail_items(mail_items: list, summary_dict=None) -> tuple[List[dict[s
     return results, non_regex_matching_emails
 
 
-def sort_mail_items_to_dataframes(items: List[Dict[str, Any]]) -> pd.DataFrame:
+def sort_mail_items_to_dataframes(items: List[dict[str, Any]]) -> pd.DataFrame:
     """Get a dataframe sorted by received_time from a list of mail item dictionaries.
 
-    :param items: List[Dict[str, Any]], A list of dictionaries, each representing a mail item.
+    :param items: List[dict[str, Any]], A list of dictionaries, each representing a mail item.
     :return: A pandas DataFrame containing the sorted mail items.
     """
     return pd.DataFrame(items).sort_values('received_time', axis=0, ascending=True).reset_index(drop=True)
