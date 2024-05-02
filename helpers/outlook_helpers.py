@@ -154,16 +154,26 @@ def map_folder_structure_to_flat_dict(parent_folder: wclient.CDispatch,
     :rtype: None
     """
     folders_dict = {}
+    folders_dict['error_folders'] = []
     folders_stack = [parent_folder]
+
     while folders_stack:
         current_folder = folders_stack.pop()
-        for olFolder in current_folder.Folders:
-            folder_path = olFolder.FolderPath
-            folders_dict[folder_path] = olFolder
-            if must_find_list:
-                if all(mfitem in folders_dict.keys() for mfitem in must_find_list):
-                    return folders_dict
-            folders_stack.append(olFolder)
+        current_folder_path = current_folder.FolderPath
+        # only go into a folder's sub folders if it is part of the root of one of the must_find_list items; too many
+        if any([x.startswith(current_folder_path) for x in must_find_list]):  # folders open at once and Outlook balks
+            for olFolder in current_folder.Folders:
+                try:
+                    folder_path = olFolder.FolderPath
+                except pywintypes.com_error as pwe:
+                    folders_dict['error_folders'].append((olFolder, pwe))
+                    continue
+                folders_dict[folder_path] = olFolder
+                if must_find_list:
+                    # stop looking once all the must find list folders are found
+                    if all(mfitem in folders_dict.keys() for mfitem in must_find_list):
+                        return folders_dict
+                folders_stack.append(olFolder)
     return folders_dict
 
 
