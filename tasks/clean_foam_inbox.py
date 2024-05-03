@@ -91,11 +91,12 @@ def get_process_folders_dfs(proc_folders: List[str], folders_dict: dict = None,
             continue
         lg.debug(f'Processing folder: {folder_path}')
 
-        # don't need a year's worth of e-mails each time
-        five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
-        date_filter = five_days_ago.strftime('%m/%d/%Y')
-        filter_string = f'''[ReceivedTime] >= '{date_filter}'''''
-        items: List[wclient.CDispatch] = olFolder.Items.Restrict(filter_string)
+        items = olFolder.Items.Restrict('[FlagRequest] <> \'Follow up\'')  # exclude those already flagged
+        if not ON_DEV_NODE:  # don't need a year's worth of e-mails each time in production, but test files will lag
+            five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
+            date_filter = five_days_ago.strftime('%m/%d/%Y')
+            filter_string = f'[ReceivedTime] >= \'{date_filter}\''
+            items: List[wclient.CDispatch] = items.Restrict(filter_string)
         results, other_emails = process_mail_items(items)
         if results:
             df = sort_mail_items_to_dataframes(results)
@@ -166,8 +167,6 @@ def get_mail_items_from_results(list_of_series, o_item_col='o_item') -> list:
     """Extract the w32com.CDispatch.client Outlook mail item from the list of Pandas' series."""
     mail_items = []
     for p_row in list_of_series:
-        # if len(p_row) > 1:
-        #     lg.warning(f'mirs row list had more than a single item.')
         for rlist in p_row:
             mail_items.append(rlist[1][o_item_col])
     return mail_items
