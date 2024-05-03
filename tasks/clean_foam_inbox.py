@@ -90,7 +90,12 @@ def get_process_folders_dfs(proc_folders: List[str], folders_dict: dict = None,
             lg.debug(f'{folder_path} was not found and will not be processed!')
             continue
         lg.debug(f'Processing folder: {folder_path}')
-        items: List[wclient.CDispatch] = olFolder.Items
+
+        # don't need a year's worth of e-mails each time
+        five_days_ago = datetime.datetime.now() - datetime.timedelta(days=5)
+        date_filter = five_days_ago.strftime('%m/%d/%Y')
+        filter_string = f'''[ReceivedTime] >= '{date_filter}'''''
+        items: List[wclient.CDispatch] = olFolder.Items.Restrict(filter_string)
         results, other_emails = process_mail_items(items)
         if results:
             df = sort_mail_items_to_dataframes(results)
