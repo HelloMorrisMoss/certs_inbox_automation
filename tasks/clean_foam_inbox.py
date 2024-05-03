@@ -94,7 +94,9 @@ def get_process_folders_dfs(proc_folders: List[str], folders_dict: dict = None,
         results, other_emails = process_mail_items(items)
         if results:
             df = sort_mail_items_to_dataframes(results)
-            other_emails_df = sort_mail_items_to_dataframes(other_emails)
+            dfc = df.columns
+            # in case there are no other emails, just use an empty dataframe
+            other_emails_df = sort_mail_items_to_dataframes(other_emails) if other_emails else pd.DataFrame(columns=dfc)
 
             if not df.empty:
                 df['lot8'] = df['lot_number'].str[:8]
