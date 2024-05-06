@@ -68,17 +68,18 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
     for this_folder_path, df, other_emails_df in pfdfs:
         lg.info('Processing %s', this_folder_path)
         if this_folder_path in found_folders_keys:
-            lg.info('Setting follow up flags on priority customer items.')
-            pass
-        if process_incoming_reports:
-            folder_path = acct_path_dct['local_save_folder_path']
-            nbe_cert_emails = get_nbe_emails(other_emails_df)
-            process_nbe_test_reports(folder_path, nbe_cert_emails)
-        if process_priority_customers:
-            set_priority_customer_category(df, priority_flag_dict, True)
-        if process_duplicate_foam_certs:
-            process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
-                                move_folder_com, smry)
+            if process_priority_customers:
+                lg.info('Setting follow up flags on priority customer items.')
+                set_priority_customer_category(df, priority_flag_dict, True)
+            if process_duplicate_foam_certs:
+                lg.info('Checking for duplicate foam reports for single-report customers.')
+                process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
+                                    move_folder_com, smry)
+            if process_incoming_reports:
+                lg.info('Checking for incoming reports.')
+                folder_path = acct_path_dct['local_save_folder_path']
+                nbe_cert_emails = get_nbe_emails(other_emails_df)
+                process_nbe_test_reports(folder_path, nbe_cert_emails)
         else:
             lg.warn(f'Missing {this_folder_path} in checked folders!')
 
