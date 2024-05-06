@@ -70,15 +70,15 @@ def main_process_function(found_folders_dict: Dict[str, Any], production_inbox_f
         if this_folder_path in found_folders_keys:
             lg.info('Setting follow up flags on priority customer items.')
             pass
+        if process_incoming_reports:
             folder_path = acct_path_dct['local_save_folder_path']
             nbe_cert_emails = get_nbe_emails(other_emails_df)
-            if process_incoming_reports:
-                process_nbe_test_reports(folder_path, nbe_cert_emails)
-            if process_priority_customers:
-                set_priority_customer_category(df, priority_flag_dict, True)
-            if process_duplicate_foam_certs:
-                process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
-                                    move_folder_com, smry)
+            process_nbe_test_reports(folder_path, nbe_cert_emails)
+        if process_priority_customers:
+            set_priority_customer_category(df, priority_flag_dict, True)
+        if process_duplicate_foam_certs:
+            process_foam_groups(df[df.c_number.isin(dedupe_cnums)], this_folder_path,
+                                move_folder_com, smry)
         else:
             lg.warn(f'Missing {this_folder_path} in checked folders!')
 
@@ -164,7 +164,15 @@ def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any]
         Tuple[Dict[str, Any], List[str]]: A tuple containing a dictionary of found folders and a list of production
         inbox folders.
     """
+    inbox_folders = acct_path_dct['inbox_folders']
+    must_find_folders = get_must_find_folders()
+    ol_folders = wc_outlook.get_outlook_folders()
     account_name = acct_path_dct['account_name']
+    found_folders: Dict[str, Any] = find_folders_in_outlook(ol_folders, account_name, must_find_folders)
+    return found_folders, inbox_folders
+
+
+def get_must_find_folders():
     inbox_folders = acct_path_dct['inbox_folders']
     # get current folder data
     find_folder_keys = ['target_folder_path']
@@ -173,13 +181,10 @@ def get_process_ol_folders(wc_outlook: OutlookSingleton) -> Tuple[Dict[str, Any]
                              'test_file_origin']
     test_keys = [acct_path_dct[k] for k in find_folder_keys]
     must_find_folders = inbox_folders + test_keys
-    ol_folders = wc_outlook.get_outlook_folders()
-    found_folders: Dict[str, Any] = find_folders_in_outlook(ol_folders, account_name, must_find_folders)
-    return found_folders, inbox_folders
+    return must_find_folders
 
 
-if __name__ == '__main__':
-    # ### some items in this section are for development and demonstration only ###
+if __name__ == '__main__':  # this is what is run by the scheduler
     now = datetime.datetime.now()
     lg.debug(f'Starting at {now}')
     try:
@@ -200,5 +205,5 @@ if __name__ == '__main__':
     finally:
         lg.debug('Deleting Outlook com instance.')
         del (wc_outlook)
-
+    lg.info('Completed main_process in %s seconds', (datetime.datetime.now() - now).total_seconds())
     pass  # for breakpoint

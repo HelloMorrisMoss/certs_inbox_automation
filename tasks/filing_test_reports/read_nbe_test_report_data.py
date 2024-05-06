@@ -334,9 +334,9 @@ def extract_nbe_report_data(reader: pypdf.PdfReader) -> Dict[str, dict]:
         else:  # test results pages
             test_results = get_test_results(page)
             results_df = pdf_data_dict['test_results'].get('results_df')
-            if results_df is None:
+            if results_df is None:  # the first page
                 pdf_data_dict['test_results']['results_df'] = test_results
-            else:
+            else:  # subsequent pages
                 pdf_data_dict['test_results']['results_df'] = pd.concat([results_df, test_results])
             # pdf_data_dict['test_results'].update(test_results)
     return pdf_data_dict
