@@ -74,18 +74,20 @@ def test_final_state_folders():
     known_good_final_state_inbox_folder = found_folders_dict[acct_path_dct['known_good_final_state_inbox_folder']]
     known_good_final_state_move_to_folder = found_folders_dict[acct_path_dct['known_good_final_state_move_to_folder']]
 
-    # clear old items
-    for t_folder in [inbox_folder, target_folder]:
-        tries = 10  # it looks like duplicated mail (due to interrupted testing) doesn't all delete on the first try
-        while tries and t_folder.Items:
-            tries -= 1
-            for item in t_folder.Items:
-                item.Delete()
+    reset_items = False
+    if reset_items:
+        # clear old items
+        for t_folder in [inbox_folder, target_folder]:
+            tries = 10  # it looks like duplicated mail (due to interrupted testing) doesn't all delete on the first try
+            while tries and t_folder.Items:
+                tries -= 1
+                for item in t_folder.Items:
+                    item.Delete()
 
-    pass
-    for item in test_file_origin.Items:
-        new_copy = item.Copy()
-        new_copy.Move(inbox_folder)
+        pass
+        for item in test_file_origin.Items:
+            new_copy = item.Copy()
+            new_copy.Move(inbox_folder)
 
     # Run program
     main_process_function(found_folders_dict, production_inbox_folders)
