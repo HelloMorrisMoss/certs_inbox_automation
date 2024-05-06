@@ -44,7 +44,7 @@ def setup_logger(log_file_path: str = './logs/program.log') -> logging.Logger:
         logging.Logger: The configured logger object.
     """
     logr = logging.getLogger()
-    base_log_level = logging.DEBUG if ON_DEV_NODE else logging.INFO
+    base_log_level = logging.DEBUG if (ON_DEV_NODE or RUNNING_IN_DEBUG) else logging.INFO
     logr.setLevel(base_log_level)
 
     # Console logger
